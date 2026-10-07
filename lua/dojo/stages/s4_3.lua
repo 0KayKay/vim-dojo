@@ -30,7 +30,7 @@ return {
       local ch = L:sub(p + 1, p + 1)
       local starts = {}
       for _, s in ipairs(sp) do
-        if s.s <= p - 4 then
+        if s.s <= p - 4 and s.s >= p - 18 then
           starts[#starts + 1] = s.s
         end
       end

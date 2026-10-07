@@ -9,6 +9,7 @@ local M = {}
 
 local line_to_stage, stage_to_line = {}, {}
 local mapped = false
+local last_stage -- the stage last opened from here, to return the cursor to it
 
 local function notify(msg)
   vim.api.nvim_echo({ { msg, "DojoWarn" } }, false, {})
@@ -33,6 +34,7 @@ end
 
 -- explainer first, then the drill, then challenges
 function M.continue(id)
+  last_stage = id
   if not progress.unlocked(id) then
     notify(string.format("Stage %s is locked: earn a star in %s first.", id, curriculum.prev(id)))
     return
@@ -57,6 +59,7 @@ local function with_selected(fn)
       notify(string.format("Stage %s is locked: earn a star in %s first.", id, curriculum.prev(id)))
       return
     end
+    last_stage = id
     fn(id)
   end
 end
@@ -100,6 +103,16 @@ local function map(buf)
       step(-1)
     end, o)
   end
+  vim.keymap.set("n", "gg", function()
+    vim.api.nvim_win_set_cursor(0, { stage_to_line[curriculum.order[1]], 0 })
+  end, o)
+  vim.keymap.set("n", "G", function()
+    vim.api.nvim_win_set_cursor(0, { stage_to_line[curriculum.order[#curriculum.order]], 0 })
+  end, o)
+end
+
+function M.remember(id)
+  last_stage = id
 end
 
 -- the stage to put the cursor on: the first unlocked stage without a star
@@ -157,7 +170,7 @@ function M.show(focus)
   rows[#rows + 1] = ""
   rows[#rows + 1] = { { " <CR> play   d drill   c challenge   ? explainer   H habit mode   q quit", "DojoDim" } }
   render.draw(buf, rows)
-  local id = focus or default_focus()
+  local id = focus or last_stage or default_focus()
   vim.api.nvim_win_set_cursor(win, { stage_to_line[id] or 3, 0 })
 end
 

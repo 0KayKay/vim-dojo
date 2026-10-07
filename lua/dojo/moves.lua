@@ -188,7 +188,7 @@ function M.learned_label(learned)
       parts[#parts + 1] = M.labels[f]
     end
   end
-  return table.concat(parts, " · ")
+  return table.concat(parts, "  ")
 end
 
 return M

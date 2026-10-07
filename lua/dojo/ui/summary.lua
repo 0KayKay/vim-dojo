@@ -81,7 +81,7 @@ function M.show(s, sum, newbest)
   rows[#rows + 1] = line
   rows[#rows + 1] = ""
   rows[#rows + 1] = {
-    { "  #  " .. render.fit("your keys", 16) .. render.fit("par", 5) .. render.fit("intended", 15) .. render.fit("also works", 17) .. "stars", "DojoDim" },
+    { "  #  " .. render.fit("your keys", 16) .. render.fit("par", 5) .. render.fit("intended", 15) .. render.fit("also works", 18) .. "stars", "DojoDim" },
   }
   for i, r in ipairs(s.rounds) do
     local alts = {}
@@ -91,10 +91,10 @@ function M.show(s, sum, newbest)
     local stars = r.solved and { score.stars_text(r.stars), "DojoStar" } or { "time out", "DojoBad" }
     local row = {
       { string.format(" %2d  ", i) },
-      { render.fit(your_keys(r), 16) },
+      { render.fit(your_keys(r), 15) .. " " },
       { render.fit(tostring(r.par), 5) },
-      { render.fit(r.sol.display, 15), "DojoKey" },
-      { render.fit(#alts > 0 and table.concat(alts, "  ") or "–", 17), "DojoDim" },
+      { render.fit(r.sol.display, 14) .. " ", "DojoKey" },
+      { render.fit(#alts > 0 and table.concat(alts, "  ") or "–", 17) .. " ", "DojoDim" },
       stars,
     }
     if r.hint then

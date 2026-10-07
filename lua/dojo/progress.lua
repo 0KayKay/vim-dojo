@@ -51,6 +51,13 @@ function M.reset()
   data = nil
 end
 
+-- delete saved progress and the round log (tests)
+function M.wipe()
+  data = nil
+  os.remove(path("progress.json"))
+  os.remove(path("rounds.jsonl"))
+end
+
 function M.stage(id)
   local d = M.load()
   local s = d.stages[id]

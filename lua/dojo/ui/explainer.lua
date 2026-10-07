@@ -46,17 +46,16 @@ function M.show(id)
   end
   rows[#rows + 1] = ""
   rows[#rows + 1] = { { " Example", "DojoDim" } }
-  for _, l in ipairs(ex.example.before) do
-    local segs = render.cursor_line(l, nil, "DojoTarget")
-    table.insert(segs, 1, { "     " })
-    rows[#rows + 1] = segs
+  local function block(label, lines)
+    for i, l in ipairs(lines) do
+      local segs = render.cursor_line(l, nil, "DojoTarget")
+      table.insert(segs, 1, { i == 1 and string.format("   %-8s", label) or "           ", "DojoDim" })
+      rows[#rows + 1] = segs
+    end
   end
-  rows[#rows + 1] = { { "     " }, { ex.example.keys, "DojoKey" } }
-  for _, l in ipairs(ex.example.after) do
-    local segs = render.cursor_line(l, nil, "DojoTarget")
-    table.insert(segs, 1, { "     " })
-    rows[#rows + 1] = segs
-  end
+  block("before", ex.example.before)
+  rows[#rows + 1] = { { "   type    ", "DojoDim" }, { ex.example.keys, "DojoKey" } }
+  block("after", ex.example.after)
   rows[#rows + 1] = ""
   for i, l in ipairs(render.wrap(ex.tip, width - 8)) do
     rows[#rows + 1] = { { i == 1 and " Tip: " or "      ", "DojoDim" }, { l } }

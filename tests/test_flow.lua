@@ -37,7 +37,7 @@ return {
   {
     "menu shows worlds, stars and locks",
     function()
-      progress.reset()
+      progress.wipe()
       require("dojo").open()
       H.ok(buffer_name():match("dojo://menu$"), "menu buffer")
       local t = buffer_text()
@@ -50,7 +50,7 @@ return {
   {
     "a drill played at par ends in its summary and is saved",
     function()
-      progress.reset()
+      progress.wipe()
       require("dojo").open()
       session.start("1.1", "drill", { seed = 4242 })
       play_all(config.get().drill_rounds)
@@ -62,7 +62,7 @@ return {
   {
     "a challenge played at par earns 3 stars and unlocks the next stage",
     function()
-      progress.reset()
+      progress.wipe()
       local saved = config.get().countdown_s
       config.get().countdown_s = 0
       require("dojo").open()
@@ -87,13 +87,13 @@ return {
         n = n + 1
       end
       f:close()
-      H.ok(n >= 13, "drill + challenge rounds logged, got " .. n)
+      H.eq(n, config.get().challenge_rounds, "one line per challenge round")
     end,
   },
   {
     ":q in a round goes back to the menu",
     function()
-      progress.reset()
+      progress.wipe()
       require("dojo").open()
       session.start("1.1", "drill", { seed = 7 })
       H.ok(wait_round(1))
@@ -106,7 +106,7 @@ return {
   {
     "the header shows par, round and learned moves",
     function()
-      progress.reset()
+      progress.wipe()
       require("dojo").open()
       session.start("2.1", "drill", { seed = 3 })
       H.ok(wait_round(1))
@@ -114,7 +114,7 @@ return {
       local t = table.concat(vim.api.nvim_buf_get_lines(hud, 0, -1, false), "\n")
       H.ok(t:find("round 1/5", 1, true), t)
       H.ok(t:find("par ", 1, true))
-      H.ok(t:find("Learned: h j k l · x · i a · A I · w b", 1, true), t)
+      H.ok(t:find("Learned: h j k l  x  i a  A I  w b", 1, true), t)
       session.abort()
     end,
   },

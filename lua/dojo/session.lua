@@ -230,6 +230,7 @@ function M.start(stage_id, mode, opts)
   }
   s.plan = M.plan(stage_id, mode, rng)
   cur = s
+  require("dojo.ui.menu").remember(stage_id)
   local buf = play_window()
   round.clear(buf)
   s.next = M.make_round(s.plan[1], { learned = learned, mode = mode }, rng)

@@ -1,0 +1,50 @@
+# docker compose run --rm dojo    play
+# docker compose run --rm dev     play the working copy (repo mounted, no rebuild)
+# docker compose run --rm test    run the test suite inside the image
+
+x-hardening: &hardening
+  network_mode: none
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  tmpfs:
+    - /tmp
+    - /home/trainee/.cache
+
+x-build: &build
+  context: .
+  dockerfile: docker/Dockerfile
+
+services:
+  dojo:
+    build: *build
+    image: vim-dojo:local
+    <<: *hardening
+    stdin_open: true
+    tty: true
+    volumes:
+      - dojo-data:/home/trainee/.local
+    environment:
+      - COLORTERM
+
+  dev:
+    build: *build
+    image: vim-dojo:local
+    <<: *hardening
+    stdin_open: true
+    tty: true
+    volumes:
+      - dojo-data:/home/trainee/.local
+      - ./:/opt/nvim-plugins/pack/dojo/opt/vim-dojo:ro
+    environment:
+      - COLORTERM
+
+  test:
+    build: *build
+    image: vim-dojo:local
+    <<: *hardening
+    entrypoint: ["nvim", "--headless", "-l", "/opt/nvim-plugins/pack/dojo/opt/vim-dojo/tests/run.lua"]
+    command: []
+
+volumes:
+  dojo-data:

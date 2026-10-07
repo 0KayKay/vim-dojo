@@ -62,7 +62,7 @@ return {
   {
     "progress: unlock, best result, save and load",
     function()
-      progress.reset()
+      progress.wipe()
       H.ok(progress.unlocked("1.1"))
       H.ok(not progress.unlocked("1.2"))
       progress.record_drill("1.1")
@@ -71,7 +71,7 @@ return {
       H.ok(not progress.record_challenge("1.1", { stars = 1, score = 1.2 }), "worse is not a new best")
       H.ok(progress.record_challenge("1.1", { stars = 2, score = 2.1 }))
       progress.setting("habit", true)
-      progress.reset()
+      progress.reset() -- reload from disk
       local s = progress.stage("1.1")
       H.eq(s.best_stars, 2)
       H.eq(s.attempts, 3)
