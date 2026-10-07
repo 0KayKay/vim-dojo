@@ -82,16 +82,33 @@ function M.open()
       end
     end,
   })
+  M.watch(state.win)
+  return state.win
+end
+
+-- When the main window closes (:q, <C-w>c), stop the round. If the header
+-- window is still there, it becomes the main window and shows the menu, so :q
+-- during a round means "back to the menu".
+function M.watch(win)
   vim.api.nvim_create_autocmd("WinClosed", {
     group = group,
-    pattern = tostring(state.win),
+    pattern = tostring(win),
+    once = true,
     callback = function()
-      require("dojo.session").abort()
-      state.win = nil
-      vim.schedule(M.close_hud)
+      local hud = state.hud
+      state.win, state.hud = nil, nil
+      require("dojo.round").abort()
+      vim.schedule(function()
+        require("dojo.session").abort()
+        if valid_win(hud) then
+          state.win = hud
+          wset(hud, "winfixheight", false)
+          M.watch(hud)
+          require("dojo.ui.menu").show()
+        end
+      end)
     end,
   })
-  return state.win
 end
 
 -- show a named buffer in the main window

@@ -25,9 +25,6 @@ function M.prepare_buffer(buf)
   vim.keymap.set("n", "<Tab>", function()
     M.hint()
   end, { buffer = buf, nowait = true, desc = "Vim Dojo: show the intended solution" })
-  vim.api.nvim_buf_call(buf, function()
-    vim.cmd([[cnoreabbrev <buffer> <expr> q (getcmdtype() ==# ':' && getcmdline() ==# 'q') ? 'DojoMenu' : 'q']])
-  end)
 end
 
 -- Highlights: target cell for move rounds; for edit rounds the span to change
