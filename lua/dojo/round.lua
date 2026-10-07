@@ -116,8 +116,8 @@ local function finish(solved)
   a.done = true
   active = nil
   cleanup(a)
-  local mode = vim.api.nvim_get_mode().mode
-  if mode ~= "n" then
+  -- leave Insert/operator-pending mode, but only in the game's own window
+  if vim.api.nvim_get_current_win() == a.o.win and vim.api.nvim_get_mode().mode ~= "n" then
     vim.api.nvim_feedkeys(vim.keycode("<C-\\><C-n>"), "n", false)
   end
   if vim.api.nvim_buf_is_valid(a.o.buf) then
@@ -182,6 +182,14 @@ local function habit_blocks(a, typed, now)
   return run.n > h.grace
 end
 
+-- keys whose next key is an argument (a character or register), not a command
+local takes_arg = { f = true, F = true, t = true, T = true, r = true, m = true, q = true, ['"'] = true, ["'"] = true, ["`"] = true }
+
+local function is_mouse(typed)
+  local t = vim.fn.keytrans(typed)
+  return t:find("Mouse", 1, true) or t:find("Scroll", 1, true) or t:find("Release", 1, true) or t:find("Drag", 1, true)
+end
+
 local function on_key(_, typed)
   local a = active
   if not a or a.done or typed == nil or typed == "" then
@@ -190,9 +198,24 @@ local function on_key(_, typed)
   if vim.api.nvim_get_current_win() ~= a.o.win then
     return
   end
+  if is_mouse(typed) then
+    return "" -- keyboard only (SPEC §5): clicks would beat par
+  end
   local mode = vim.api.nvim_get_mode().mode
+  if a.arg_next then
+    -- the character after f/t/r/…: record it, but it is not a command
+    a.arg_next = false
+    a.prev_typed = nil
+    a.count = a.count + 1
+    a.keys[#a.keys + 1] = { k = keys.typed(typed), mode = "arg" }
+    vim.schedule(check)
+    return
+  end
   if mode == "n" and (typed == "\t" or typed == "\27") then
     return -- hint key, or <Esc> that changes nothing: free
+  end
+  if (mode == "n" or mode:sub(1, 2) == "no") and takes_arg[typed] then
+    a.arg_next = true
   end
   if a.o.habit and mode == "n" and habit_blocks(a, typed, M.clock()) then
     a.blocked = a.blocked + 1

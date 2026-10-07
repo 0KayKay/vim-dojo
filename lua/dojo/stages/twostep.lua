@@ -32,6 +32,12 @@ return {
     if ctx.learned.line then
       options[#options + 1] = #lines[r2] - 1
     end
+    -- not straight above or below: that would be a single j or k
+    for i = #options, 1, -1 do
+      if options[i] == c then
+        table.remove(options, i)
+      end
+    end
     if #options == 0 then
       return nil
     end

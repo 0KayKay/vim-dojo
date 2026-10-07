@@ -31,8 +31,8 @@ for _, id in ipairs(curriculum.order) do
           end
         end
         io.stdout:write(string.format("        slowest round %.0f ms\n", slowest))
-        -- budget: 200 ms per round (SPEC §9); generous here for slow CI machines
-        H.ok(slowest < 1500, string.format("round generation too slow: %.0f ms", slowest))
+        -- budget: 200 ms per round (SPEC §9); the test allows 800 ms for slow CI machines
+        H.ok(slowest < 800, string.format("round generation too slow: %.0f ms", slowest))
       end,
     }
   end
@@ -64,6 +64,7 @@ cases[#cases + 1] = {
     for _ = 1, 50 do
       local r = session.make_round("twostep", { learned = learned, mode = "challenge" }, rng)
       H.ok(solver.check(r.task, r.sol.tokens))
+      H.ok(#r.sol.tokens >= 2, "two-step round solved in one move: " .. r.sol.keys)
     end
   end,
 }

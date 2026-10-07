@@ -46,13 +46,34 @@ local function scratch_win()
   return scratch
 end
 
+-- registers the solver's x/d/c would overwrite
+local REGS = { "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-", '"' }
+
+-- Run fn in the hidden scratch window without touching the user's session:
+-- no autocommands, no clipboard provider, registers and the last f/t search
+-- restored afterwards (AGENTS.md rule 5).
 local function with_scratch(fn)
   local sw = scratch_win()
-  local ei = vim.o.eventignore
+  local ei, cb = vim.o.eventignore, vim.o.clipboard
   vim.o.eventignore = "all"
+  vim.o.clipboard = ""
+  local regs = {}
+  for _, r in ipairs(REGS) do
+    regs[r] = vim.fn.getreginfo(r)
+  end
+  local cs = vim.fn.getcharsearch()
   local ok, res = pcall(vim.api.nvim_win_call, sw.win, function()
     return fn(sw.buf, sw.win)
   end)
+  for _, r in ipairs(REGS) do
+    if regs[r].regcontents then
+      vim.fn.setreg(r, regs[r])
+    else
+      vim.fn.setreg(r, "")
+    end
+  end
+  vim.fn.setcharsearch(cs)
+  vim.o.clipboard = cb
   vim.o.eventignore = ei
   if not ok then
     error(res, 0)

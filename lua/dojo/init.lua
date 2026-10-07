@@ -6,8 +6,10 @@ function M.setup(opts)
 end
 
 function M.open()
+  require("dojo.session").abort()
   require("dojo.ui.hl").setup()
   require("dojo.progress").load()
+  require("dojo.ui.layout").focus()
   require("dojo.ui.menu").show()
 end
 
@@ -15,6 +17,7 @@ end
 function M.menu()
   require("dojo.session").abort()
   require("dojo.ui.hl").setup()
+  require("dojo.ui.layout").focus()
   require("dojo.ui.menu").show()
 end
 

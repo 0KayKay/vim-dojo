@@ -31,7 +31,13 @@ function M.make_round(pick, ctx, rng)
       task.seed = seed
       task.stage = pick
       local sol = solver.solve(task, ctx.learned, { focus = gen.focus })
-      if sol and sol.cost > 0 and (ctx.mode ~= "drill" or sol.focus) and solver.check(task, sol.tokens) then
+      if
+        sol
+        and sol.cost > 0
+        and (ctx.mode ~= "drill" or sol.focus)
+        and (pick ~= "twostep" or #sol.tokens >= 2) -- a vertical and a horizontal move
+        and solver.check(task, sol.tokens)
+      then
         return { task = task, sol = sol, focus = gen.focus, pick = pick }
       end
     end
@@ -159,6 +165,7 @@ function M.round_done(s, r, res)
   -- use the pause for the slow work: alternatives, and the next round
   local t0 = vim.uv.hrtime()
   r.alts = solver.alternatives(r.task, s.learned, r.sol, { focus = r.focus })
+  hud().result(s, r) -- again, now with the alternatives
   local more = s.i < #s.plan
   if more then
     s.next = M.make_round(s.plan[s.i + 1], { learned = s.learned, mode = s.mode }, s.rng)

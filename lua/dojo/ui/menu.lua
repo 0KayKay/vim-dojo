@@ -8,7 +8,7 @@ local score = require("dojo.score")
 local M = {}
 
 local line_to_stage, stage_to_line = {}, {}
-local mapped = false
+local mapped -- the buffer that has our keymaps (it can be wiped and recreated)
 local last_stage -- the stage last opened from here, to return the cursor to it
 
 local function notify(msg)
@@ -131,9 +131,9 @@ end
 
 function M.show(focus)
   local buf, win = layout.show("menu")
-  if not mapped then
+  if mapped ~= buf then
     map(buf)
-    mapped = true
+    mapped = buf
   end
   local total, max = progress.total_stars()
   local habit = progress.setting("habit") and "on" or "off"

@@ -8,7 +8,7 @@ local score = require("dojo.score")
 local M = {}
 
 local last -- { s, sum }
-local mapped = false
+local mapped -- the buffer that has our keymaps (it can be wiped and recreated)
 
 local function map(buf)
   local o = { buffer = buf, nowait = true, silent = true }
@@ -46,9 +46,9 @@ end
 function M.show(s, sum, newbest)
   last = { s = s, sum = sum }
   local buf, win = layout.show("summary")
-  if not mapped then
+  if mapped ~= buf then
     map(buf)
-    mapped = true
+    mapped = buf
   end
   local width = vim.api.nvim_win_get_width(win)
   local head = string.format(" %s %s · %s complete", s.stage.id, s.stage.title, s.mode == "drill" and "Drill" or "Challenge")

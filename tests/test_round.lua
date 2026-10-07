@@ -178,6 +178,36 @@ return {
     end,
   },
   {
+    "habit mode never blocks the character after f",
+    function()
+      local task = { kind = "move", lines = { "abc def efg hij" }, cursor = { 1, 0 }, goal = { 1, 8 } }
+      local r = run(task, { "e", "e", "fe" }, { habit = true })
+      H.ok(r and r.solved, "e e fe reaches the e of efg")
+      H.eq(r.blocked, 0)
+      H.eq(r.count, 4)
+      H.eq(r.keys[4].mode, "arg")
+    end,
+  },
+  {
+    "mouse keys are ignored",
+    function()
+      local buf, win = setup_window()
+      local result
+      round.start({
+        buf = buf,
+        win = win,
+        task = move,
+        on_done = function(r)
+          result = r
+        end,
+      })
+      H.type("<LeftMouse>")
+      H.type("3w")
+      H.settle(30)
+      H.eq(result.count, 2)
+    end,
+  },
+  {
     "without habit mode repeats are fine",
     function()
       local task = { kind = "move", lines = { "a", "b", "c", "d" }, cursor = { 1, 0 }, goal = { 4, 0 } }

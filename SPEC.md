@@ -1,6 +1,6 @@
 # Vim Dojo — Specification
 
-**Status:** prototype spec, version 0.3 (2026-10-07). This file is the source of
+**Status:** prototype spec, version 0.4 (2026-10-07). This file is the source of
 truth for how the game behaves. How to change it: see [AGENTS.md](AGENTS.md).
 Why things are the way they are: [docs/decisions/](docs/decisions/).
 
@@ -58,8 +58,9 @@ next stage.
 1. **Explainer.** One screen: what the move does, its keys in Vim notation, a
    before/after example and a tip. Shown automatically the first time; can be
    reopened from the menu.
-2. **Drill.** 5 rounds that need the new move. No timer, free hints, no stars.
-   Required once before the challenge; replayable any time.
+2. **Drill.** 5 rounds that need the new move. No timer, free hints, and no
+   stage stars (each round still shows how close you were to par). Required
+   once before the challenge; replayable any time.
 3. **Challenge.** 8 timed rounds mixing every move learned so far. Earns 0–3
    stars; 1 star unlocks the next stage.
 
@@ -127,8 +128,10 @@ color in the last 2 s, and each challenge opens with a 3-2-1 countdown.
 | `<Tab>` | Hint: shows the intended solution. In a challenge, that round can then earn at most 1 star. |
 | `:q` | Back to the menu (it closes the play window; the header window becomes the menu). An unfinished drill or challenge is discarded. |
 
-Everything else is plain Neovim, with relative line numbers on and the mouse
-off.
+Everything else is plain Neovim, with relative line numbers on. Mouse clicks
+and scrolling are ignored during rounds (keyboard only, and a click would beat
+par). Leaving the game's tab stops the running drill or challenge, and `:Dojo`
+during a round goes back to the menu.
 
 **Habit mode** (optional, after delaytrain.nvim). Off by default; toggled with
 `H` in the menu and saved. In stages where counts are already learned (2.4 and
@@ -172,9 +175,10 @@ the counted form, for example `jjjj → 4j`. It appears with the round's result
 and in the summary.
 
 **Feedback.** After a success the next round starts after 0.4 s; after a fail,
-the intended solution is shown and the next round starts after 1.5 s. The
-previous round's result stays in the header during the next one, for example
-`✓ 3 keys · par 2 · ★★ · intended 3w`. The summary after every drill and
+after 1.5 s. The result stays in the header during the next round: stars, your
+keys, par with the intended solution, and up to two alternatives, for example
+`✓ ★★☆ 3 keys · you www · par 2: 3w · also 3e`. Alternatives appear a moment
+later, once computed. The summary after every drill and
 challenge lists each round: your keys, the intended solution and alternatives.
 
 ## 7. Curriculum
@@ -215,7 +219,7 @@ source treats as essential. Explainer texts are written for this game.
 | --- | --- | --- | --- |
 | 4.1 | `f` `F` | move | A character 6 to 40 columns away on a code-like line |
 | 4.2 | `t` `T` | move | The cell just before or after a punctuation mark |
-| 4.3 | `dt,` `df)` `ct)` `cf,` | edit | Delete or change up to a punctuation mark |
+| 4.3 | `dt,` `df)` `ct)` | edit | Delete or change up to a punctuation mark, 4 to 18 columns away |
 
 Long hops with `l` stop being the best answer once `w`, `e` and `f` arrive. The
 solver picks that up on its own, so older stages get harder in later challenges
@@ -389,13 +393,18 @@ the suite).
 **Tests** run headless with `nvim -l tests/run.lua`, a small runner of our own.
 
 - Every stage, 200 seeds (drill and challenge context): the intended solution
-  and every alternative, replayed with real keys, reach the goal; the intended
-  solution is par keys long; drill solutions use the stage's move.
+  replays to the goal and is par keys long; drill solutions use the stage's
+  move; two-step rounds need at least two moves. For 10 rounds per stage,
+  every alternative replays too. Replays use `normal!`; real typed keys are
+  covered by the round runner tests.
 - Solver cases with known answers (`3w`, `$`, `3kw`, `dt,`, `cebar<Esc>`).
 - Round runner: keys fed with `nvim_feedkeys`, asserting key count, success,
   timeout and habit-mode blocking.
 - Star rules, unlock rule, saving then loading progress.
-- Solver time per round stays within budget.
+- Solver time per round: the budget is 200 ms; the test fails above 800 ms to
+  allow for slow CI machines, and prints the slowest round.
+- The game leaves the user's session alone: registers, last `f`/`t` search
+  and clipboard setting survive the solver; no stray buffers or keymaps.
 
 **CI** (GitHub Actions): the test suite on the pinned Neovim, and a Docker build
 that runs the suite inside the image.
@@ -480,3 +489,4 @@ from your weakest moves.
 | 0.1 | 2026-10-07 | First prototype spec (10 stages, two worlds), reviewed as a doc |
 | 0.2 | 2026-10-07 | Moved into the repo; curriculum reordered after vimtutor (14 stages); habit mode and hints; solver details; CI |
 | 0.3 | 2026-10-07 | From building and the first playtest: count limits for `h l x`, solver pruning, `:q` and menu focus behavior, stage file names |
+| 0.4 | 2026-10-07 | From an independent code review: full per-round feedback, mouse ignored, leaving the tab stops a round, two-step rounds need two moves, test wording matches what is tested |

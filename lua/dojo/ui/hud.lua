@@ -67,23 +67,35 @@ function M.blocked(s, r, key)
   draw(s, r, r.elapsed)
 end
 
--- the result of a finished round, shown during the pause and the next round
+-- the result of a finished round, shown during the pause and the next round:
+-- your keys, the intended solution and alternatives (SPEC §6 Feedback)
 function M.result(s, r)
+  local mine = {}
+  for _, k in ipairs(r.result and r.result.keys or {}) do
+    mine[#mine + 1] = k.k
+  end
   local segs = {}
   if r.solved then
     segs[#segs + 1] = { " ✓ ", "DojoOk" }
-    segs[#segs + 1] = { string.format("%d %s · par %d", r.count, r.count == 1 and "key" or "keys", r.par) }
-    segs[#segs + 1] = { " · " }
     segs[#segs + 1] = { score.stars_text(r.stars), "DojoStar" }
+    segs[#segs + 1] = { string.format(" %d %s", r.count, r.count == 1 and "key" or "keys") }
     if r.count < r.par and not r.hint then
       segs[#segs + 1] = { " under par!", "DojoOk" }
     end
+    segs[#segs + 1] = { " · you " }
+    segs[#segs + 1] = { render.fit(table.concat(mine), math.min(14, math.max(1, render.width(table.concat(mine))))) }
   else
     segs[#segs + 1] = { " ✗ time out", "DojoBad" }
   end
-  if r.count ~= r.par or not r.solved then
-    segs[#segs + 1] = { " · intended " }
-    segs[#segs + 1] = { r.sol.display, "DojoKey" }
+  segs[#segs + 1] = { string.format(" · par %d: ", r.par) }
+  segs[#segs + 1] = { r.sol.display, "DojoKey" }
+  if r.alts and r.alts[1] then
+    local alts = {}
+    for i = 1, math.min(2, #r.alts) do
+      alts[#alts + 1] = r.alts[i].display
+    end
+    segs[#segs + 1] = { " · also " }
+    segs[#segs + 1] = { table.concat(alts, ", "), "DojoKey" }
   end
   if r.hints and r.hints[1] then
     segs[#segs + 1] = { " · tip: " .. r.hints[1], "DojoDim" }

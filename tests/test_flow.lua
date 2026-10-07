@@ -104,6 +104,46 @@ return {
     end,
   },
   {
+    ":Dojo during a round stops it and shows the menu",
+    function()
+      progress.wipe()
+      require("dojo").open()
+      session.start("1.1", "drill", { seed = 11 })
+      H.ok(wait_round(1))
+      vim.cmd("Dojo")
+      H.settle(30)
+      H.eq(session.current(), nil)
+      H.ok(not round.is_active())
+      H.ok(buffer_name():match("dojo://menu$"))
+    end,
+  },
+  {
+    "opening and closing the game leaves no empty buffers behind",
+    function()
+      require("dojo.ui.layout").close()
+      vim.cmd("silent! %bwipe!")
+      local function listed()
+        return #vim.fn.getbufinfo({ buflisted = 1 })
+      end
+      local before = listed()
+      for _ = 1, 3 do
+        require("dojo").open()
+        require("dojo.ui.layout").close()
+      end
+      H.eq(listed(), before)
+    end,
+  },
+  {
+    "menu keymaps survive a wiped buffer",
+    function()
+      require("dojo").open()
+      vim.cmd("silent! %bwipe!")
+      require("dojo").open()
+      local maps = vim.api.nvim_buf_get_keymap(0, "n")
+      H.ok(#maps > 5, "menu has its keymaps again")
+    end,
+  },
+  {
     "the header shows par, round and learned moves",
     function()
       progress.wipe()

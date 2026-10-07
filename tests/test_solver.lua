@@ -148,6 +148,23 @@ return {
     end,
   },
   {
+    "the solver leaves registers and the last f/t search alone",
+    function()
+      vim.fn.setreg('"', "mine")
+      vim.fn.setreg("-", "small")
+      vim.fn.setreg("1", "one")
+      vim.fn.setcharsearch({ char = "z", forward = 1, ["until"] = 0 })
+      local cb = vim.o.clipboard
+      local t = edit({ "call(one two, three);" }, { 1, 5 }, { "call(, three);" })
+      H.ok(solver.solve(t, H.learned({ "hjkl", "wb", "e", "line", "x", "d", "f", "t" })))
+      H.eq(vim.fn.getreg('"'), "mine")
+      H.eq(vim.fn.getreg("-"), "small")
+      H.eq(vim.fn.getreg("1"), "one")
+      H.eq(vim.fn.getcharsearch().char, "z")
+      H.eq(vim.o.clipboard, cb)
+    end,
+  },
+  {
     "unsolvable within the cost limit returns nil",
     function()
       local t = move(lorem, { 1, 0 }, { 6, 40 })

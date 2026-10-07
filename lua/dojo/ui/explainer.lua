@@ -7,7 +7,7 @@ local progress = require("dojo.progress")
 local M = {}
 
 local current
-local mapped = false
+local mapped -- the buffer that has our keymaps (it can be wiped and recreated)
 
 local function map(buf)
   local o = { buffer = buf, nowait = true, silent = true }
@@ -28,9 +28,9 @@ function M.show(id)
   local st = curriculum.get(id)
   local ex = st.explainer
   local buf, win = layout.show("explainer")
-  if not mapped then
+  if mapped ~= buf then
     map(buf)
-    mapped = true
+    mapped = buf
   end
   local width = math.min(vim.api.nvim_win_get_width(win), 100)
   local rows = {

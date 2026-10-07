@@ -43,7 +43,7 @@ function M.save()
   local f = assert(io.open(tmp, "w"))
   f:write(vim.json.encode(d))
   f:close()
-  os.rename(tmp, path("progress.json"))
+  vim.uv.fs_rename(tmp, path("progress.json")) -- replaces the old file, on Windows too
 end
 
 -- forget the cached copy (tests, or after the data dir changes)

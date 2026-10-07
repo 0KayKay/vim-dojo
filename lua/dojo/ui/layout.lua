@@ -52,10 +52,9 @@ local function window_options(win, play)
 end
 
 function M.open()
+  -- never switch windows here: timers call this too (next round, summary),
+  -- and the player may be in another tab. Only focus() moves the cursor.
   if valid_win(state.win) then
-    if vim.api.nvim_get_current_win() ~= state.win then
-      vim.api.nvim_set_current_win(state.win)
-    end
     return state.win
   end
   local reuse = config.get().quit_on_close
@@ -65,10 +64,25 @@ function M.open()
     and vim.api.nvim_buf_line_count(0) <= 1
   if not reuse then
     vim.cmd("tabnew")
+    state.wipe = vim.api.nvim_get_current_buf() -- tabnew's empty buffer
   end
   state.tab = vim.api.nvim_get_current_tabpage()
   state.win = vim.api.nvim_get_current_win()
   vim.api.nvim_clear_autocmds({ group = group })
+  -- leaving the game tab stops the round; the clock must not run unseen
+  vim.api.nvim_create_autocmd("TabLeave", {
+    group = group,
+    callback = function()
+      if vim.api.nvim_get_current_tabpage() == state.tab and require("dojo.session").current() then
+        vim.schedule(function()
+          require("dojo.session").abort()
+          if valid_win(state.win) then
+            require("dojo.ui.menu").show()
+          end
+        end)
+      end
+    end,
+  })
   -- the header window is never the place to type
   vim.api.nvim_create_autocmd("WinEnter", {
     group = group,
@@ -111,12 +125,26 @@ function M.watch(win)
   })
 end
 
+-- open the game if needed and put the cursor in it (user commands only)
+function M.focus()
+  local win = M.open()
+  if vim.api.nvim_get_current_win() ~= win then
+    vim.api.nvim_set_current_win(win)
+  end
+  return win
+end
+
 -- show a named buffer in the main window
 function M.show(name, opts)
   local win = M.open()
   local b = M.buf(name)
   vim.api.nvim_win_set_buf(win, b)
   window_options(win, opts and opts.play or false)
+  local w = state.wipe
+  if w and vim.api.nvim_buf_is_valid(w) and #vim.fn.win_findbuf(w) == 0 and not vim.bo[w].modified then
+    pcall(vim.api.nvim_buf_delete, w, { force = true })
+  end
+  state.wipe = nil
   return b, win
 end
 
