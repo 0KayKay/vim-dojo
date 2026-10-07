@@ -1,0 +1,4 @@
+# local Neovim downloads and test scratch
+/.nvim/
+/.tests/
+*.log
