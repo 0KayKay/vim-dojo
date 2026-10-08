@@ -75,8 +75,10 @@ next stage. Each world ends with a boss; beating it opens the next world.
 4. **Boss** (end of each world). 10 timed rounds: 6 mixed rounds that combine
    at least two different moves, then 4 *chains* of 2–3 steps (go here, then
    change that, then go there). Mixed rounds take turns among the world's
-   stages, so each stage's move comes up. Every round needs at least one move
-   from this world. Beating it (1 star) unlocks the next world. The summary shows how you
+   stages and need that stage's move, so each one comes up; stages that only
+   move the cursor sit out while `h j k l` is the only motion (in World 1: `x`,
+   `i a` and `A I` take turns). Every round needs at least one move from this
+   world. Beating it (1 star) unlocks the next world. The summary shows how you
    did per move and names your weakest one.
 
 ```mermaid
@@ -126,9 +128,11 @@ and the next round starts on its own.
   combined rounds too, such as `df,` and `ct)` for `f` and `t`.
 - *Chains* (bosses only): 2–3 steps on different lines of one buffer, each a
   move or an edit, done in order. Only the current step is highlighted and the
-  header shows `step 2/3`. The round ends after the last step. Its par is the
-  sum of the steps' pars along the intended path, so finishing a step somewhere
-  else can make a later step a key longer or shorter.
+  header shows `step 2/3`; the text can be changed only during edit steps. The
+  round ends after the last step. Its par is the sum of the steps' pars along
+  the intended path, cursor and remembered column included (after `$`, `j`
+  keeps to line ends), so finishing a step somewhere else can make a later step
+  a key longer or shorter.
 
 **Randomness.** Every round comes from a seeded generator: words from a word
 list, start and target positions, distances, target characters. Constraints
@@ -486,8 +490,9 @@ old 4.3 is dropped (docs/decisions/0010). `rounds.jsonl` logs every round
 
 **Unlock rules.** A stage is unlocked when it is the first one, when the entry
 before it (stage or boss) has at least 1 star, when it has a star itself (for
-example after migration), or when its world's boss has been beaten. A boss is
-unlocked as soon as its world's first stage is.
+example after migration), when it was open in a version 1 save, or when its
+world's boss has been beaten. A boss is unlocked as soon as its world's first
+stage is.
 
 **Docker.** No network, read-only filesystem, no capabilities, non-root user, a
 data volume. The plugin is copied from the repo at build time. Services:
