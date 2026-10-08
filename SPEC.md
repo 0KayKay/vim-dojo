@@ -429,7 +429,9 @@ Vim's motion rules, which is where hand-written par goes wrong (`cw` acting like
 1. The session plans the rounds (basic, combined, mixed or chain) and asks the
    stage's generator for a task: its basic generator, its own combined
    generator if it has one, or the basic task passed through the generic
-   *combine* step (taller buffer, cursor moved away). Chains stack single-line
+   *combine* step (taller buffer, cursor moved away). Half of the single-line
+   rounds from a stage's own combined generator go through the combine step
+   too, so `dt,` also comes as `2jdt,`. Chains stack single-line
    tasks from several stages on separate lines of one buffer.
 2. The solver returns par, the intended solution, its concept tags and
    alternatives. The session retries generation if a requirement fails: no
