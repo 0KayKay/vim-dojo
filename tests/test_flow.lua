@@ -186,8 +186,9 @@ return {
       config.get().countdown_s = saved
       H.ok(buffer_name():match("dojo://summary$"), "summary buffer")
       t = buffer_text()
+      H.ok(t:find("World 1 boss complete", 1, true), t)
       H.ok(t:find("By move", 1, true), t)
-      H.ok(t:find("chain", 1, true), t)
+      H.ok(t:find(" · ", 1, true), "chain steps are listed: " .. t)
       H.eq(progress.stage("boss_1").best_stars, 3)
       -- beating a boss opens the next world, and skips what is left of this one
       H.ok(progress.unlocked("word"))

@@ -108,6 +108,19 @@ return {
     end,
   },
   {
+    "smaller counts break ties: 2k…d$, not 09bd$ across lines",
+    function()
+      local t = edit(
+        { "else gain key poem mail trip", "soft rope pink sort meal lady cash", "club girl food lock" },
+        { 3, 18 },
+        { "else gain key poem ", "soft rope pink sort meal lady cash", "club girl food lock" }
+      )
+      local r = solver.solve(t, H.learned({ "hjkl", "count", "wb", "e", "line", "d" }), { focus = { { "d" } } })
+      H.eq(r.cost, 5)
+      H.eq(r.keys:sub(1, 2), "2k", r.keys)
+    end,
+  },
+  {
     "2x beats xx on ties (fewer commands)",
     function()
       local t = edit({ "the brxqown fox" }, { 1, 6 }, { "the brown fox" })

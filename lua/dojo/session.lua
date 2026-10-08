@@ -17,14 +17,20 @@ local cur -- the running session
 
 -- Round specs in a plan:
 --   { key = stage, variant = "basic" | "combined" }   drill and challenge rounds
---   { variant = "mixed" }                             boss: two move families
+--   { key = stage, variant = "mixed" }                boss: two move families
 --   { variant = "chain", steps = n }                  boss: n steps in a row
 function M.plan(key, mode, rng)
   local cfg = config.get()
   local p = {}
   if mode == "boss" then
-    for _ = 1, cfg.boss_mixed_rounds do
-      p[#p + 1] = { variant = "mixed" }
+    -- mixed rounds take turns among the world's stages, so the stages whose
+    -- rounds combine most easily don't win every pick
+    local keys = vim.tbl_filter(function(k)
+      return curriculum.can_mix(k, key)
+    end, curriculum.stages_through(key, curriculum.get(key).world))
+    rng:shuffle(keys)
+    for i = 1, cfg.boss_mixed_rounds do
+      p[#p + 1] = { key = keys[(i - 1) % #keys + 1], variant = "mixed" }
     end
     for _, n in ipairs(cfg.boss_chains) do
       p[#p + 1] = { variant = "chain", steps = n }
@@ -65,23 +71,38 @@ local function uses_world(concepts, w)
   return false
 end
 
--- Solutions that repeat one capped move three times (4l4l4l) teach nothing
--- but patience; such rounds are generated again.
+-- Solutions that use one capped move three times (4l4l4l, 4l4ll4l) teach
+-- nothing but patience; such rounds are generated again.
 local function clunky(sol)
-  local run, prev = 0, nil
+  local seen = {}
   for _, t in ipairs(sol.tokens) do
-    if t.keys == prev then
-      run = run + 1
-      if run >= 3 then
-        return true
-      end
-    else
-      run, prev = 1, t.keys
+    seen[t.keys] = (seen[t.keys] or 0) + 1
+    if seen[t.keys] >= 3 then
+      return true
     end
   end
   return false
 end
 M.clunky = clunky
+
+-- Would habit mode block this solution? Three presses of one habit key in a
+-- row (kkk); typed text does not count.
+function M.habit_breaking(sol)
+  local habit = config.get().habit.keys
+  local run, prev = 0, nil
+  for _, t in ipairs(sol.tokens) do
+    if #t.keys == 1 and habit:find(t.keys, 1, true) then
+      run = t.keys == prev and run + 1 or 1
+      prev = t.keys
+      if run >= 3 then
+        return true
+      end
+    else
+      run, prev = 0, nil
+    end
+  end
+  return false
+end
 
 -- a task from a stage: basic, the stage's own combined generator, or the
 -- generic combine step
@@ -186,9 +207,16 @@ function M.make_round(spec, ctx, rng)
   if spec.variant == "chain" then
     return make_chain(spec, ctx, rng)
   end
-  local candidates = spec.key and { spec.key } or curriculum.stages_through(ctx.key, ctx.world)
+  local tries = config.get().generate_tries
+  local world_keys = curriculum.stages_through(ctx.key, ctx.world)
   local gctx = { learned = ctx.learned, mode = ctx.mode, variant = spec.variant }
-  for _ = 1, config.get().generate_tries do
+  for i = 1, tries do
+    -- a mixed round falls back to any stage of the world when its own stage
+    -- can't combine with two moves (h j k l alone, say)
+    local candidates = world_keys
+    if spec.key and not (spec.variant == "mixed" and i > tries / 2) then
+      candidates = { spec.key }
+    end
     local seed = rng:seed()
     local r = Rng.new(seed)
     local st = curriculum.get(r:pick(candidates))
@@ -324,6 +352,11 @@ function M.round_done(s, r, res)
   local t0 = vim.uv.hrtime()
   if r.variant ~= "chain" then
     r.alts = solver.alternatives(r.task, s.learned, r.sol, { focus = r.focus })
+    if s.learned.count then
+      r.alts = vim.tbl_filter(function(a)
+        return not M.habit_breaking(a)
+      end, r.alts)
+    end
     hud().result(s, r) -- again, now with the alternatives
   end
   local more = s.i < #s.plan

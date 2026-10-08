@@ -49,6 +49,7 @@ local function window_options(win, play, status)
   wset(win, "spell", false)
   wset(win, "colorcolumn", "")
   wset(win, "statuscolumn", "")
+  wset(win, "fillchars", "eob: ") -- no ~ below short screens
   -- '%' starts a statusline item; key help is plain text
   local text = (status or " Vim Dojo"):gsub("%%", "%%%%")
   wset(win, "statusline", text)
@@ -145,6 +146,7 @@ function M.show(name, opts)
   local b = M.buf(name)
   vim.api.nvim_win_set_buf(win, b)
   window_options(win, opts.play or false, opts.status)
+  vim.cmd('echo ""') -- a message from the last screen does not belong here
   local w = state.wipe
   if w and vim.api.nvim_buf_is_valid(w) and #vim.fn.win_findbuf(w) == 0 and not vim.bo[w].modified then
     pcall(vim.api.nvim_buf_delete, w, { force = true })
@@ -154,7 +156,7 @@ function M.show(name, opts)
 end
 
 function M.play()
-  return M.show("play", { play = true })
+  return M.show("play", { play = true, status = " <Tab> hint   :q menu" })
 end
 
 function M.open_hud()

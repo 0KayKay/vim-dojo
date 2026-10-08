@@ -55,7 +55,7 @@ function M.make(w, world, next_name)
     adds = {},
     focus = nil,
     explainer = {
-      heading = string.format("Boss · World %d: %s", w, world.name),
+      heading = string.format("World %d: %s", w, world.name),
       keys = {
         { "rounds 1-6", "mixed: at least two different moves in each" },
         { "rounds 7-10", "chains of 2-3 steps, one highlighted at a time" },

@@ -100,6 +100,25 @@ function M.stages_through(key, w)
   return out
 end
 
+-- families that only move the cursor
+local MOTIONS = { hjkl = true, wb = true, e = true, line = true, f = true, t = true }
+
+-- Can a stage supply a boss's mixed round (two move families besides counts)?
+-- Edit stages always can; a move stage only once two motion families are
+-- known (not in World 1, where h j k l is the only motion).
+function M.can_mix(key, through)
+  if by_key[key].kind ~= "move" then
+    return true
+  end
+  local n = 0
+  for f in pairs(M.learned_through(through)) do
+    if MOTIONS[f] then
+      n = n + 1
+    end
+  end
+  return n >= 2
+end
+
 -- can a stage's rounds combine its move with another move family?
 function M.can_combine(key)
   local st = by_key[key]

@@ -131,8 +131,20 @@ function M.remember(key)
   last_key = key
 end
 
--- the entry to put the cursor on: the first unlocked stage without a star
+-- the entry to put the cursor on: the one after the furthest entry with a
+-- star (after a boss, the next world), else the first unlocked stage without
+-- a star
 local function default_focus()
+  local furthest
+  for i, key in ipairs(curriculum.order) do
+    if progress.stage(key).best_stars > 0 then
+      furthest = i
+    end
+  end
+  local after = furthest and curriculum.order[furthest + 1]
+  if after and progress.unlocked(after) then
+    return after
+  end
   local last
   for _, key in ipairs(curriculum.order) do
     if progress.unlocked(key) and not curriculum.get(key).is_boss then

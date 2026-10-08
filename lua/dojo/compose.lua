@@ -103,13 +103,17 @@ function M.line_step(task)
   return { kind = "edit", line = task.lines[1], goal_line = task.goal_lines[1], prompt = task.prompt }
 end
 
--- a plain "go here" step
+-- a plain "go here" step, on a letter (a highlighted space is hard to see)
 function M.spot_step(rng, code)
   local line = filler(rng, code)
+  local col
+  repeat
+    col = rng:int(0, #line - 1)
+  until line:sub(col + 1, col + 1) ~= " "
   return {
     kind = "move",
     line = line,
-    goal_col = rng:int(0, #line - 1),
+    goal_col = col,
     prompt = "Move to the highlighted character",
   }
 end

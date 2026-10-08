@@ -63,7 +63,8 @@ function M.show(s, sum, newbest)
     mapped = buf
   end
   local width = vim.api.nvim_win_get_width(win)
-  local head = string.format(" %s %s · %s complete", s.stage.id, s.stage.title, mode_name[s.mode])
+  local head = s.mode == "boss" and string.format(" %s World %d boss complete", s.stage.id, s.stage.world)
+    or string.format(" %s %s · %s complete", s.stage.id, s.stage.title, mode_name[s.mode])
   local right = s.mode ~= "drill" and string.format("%s   score %.2f ", score.stars_text(sum.stars), sum.score) or ""
   local rows = {
     {

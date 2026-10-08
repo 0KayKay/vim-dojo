@@ -23,7 +23,9 @@ local function common(r, what)
   local task, sol = r.task, r.sol
   H.ok(not table.concat(task.lines, "\n"):find(solver.SENTINEL, 1, true), "sentinel in text: " .. what)
   H.ok(sol.cost > 0, "round already solved at start: " .. what)
-  H.ok(not session.clunky(sol), "clunky par: " .. what .. " " .. sol.display)
+  for _, part in ipairs(task.steps or { r }) do -- chains: per step
+    H.ok(not session.clunky(part.sol), "clunky par: " .. what .. " " .. part.sol.display)
+  end
 end
 
 local function uses_world(concepts, w)
@@ -156,6 +158,28 @@ cases[#cases + 1] = {
     H.eq(#b, cfg.boss_mixed_rounds + #cfg.boss_chains)
     H.eq(b[1].variant, "mixed")
     H.eq(b[#b].variant, "chain")
+    -- mixed rounds take turns among the world's stages
+    local seen = {}
+    for _, spec in ipairs(b) do
+      if spec.variant == "mixed" then
+        seen[spec.key] = (seen[spec.key] or 0) + 1
+      end
+    end
+    H.eq(seen, { word = 2, word_end = 2, line_edges = 2 })
+    -- in World 1 only the editing stages can mix two moves
+    seen = {}
+    for _, spec in ipairs(session.plan("boss_1", "boss", rng)) do
+      if spec.variant == "mixed" then
+        seen[spec.key] = (seen[spec.key] or 0) + 1
+      end
+    end
+    H.eq(seen, { x = 2, insert = 2, append = 2 })
+    -- World 1's first stage can't mix two moves on its own: it falls back
+    local c1 = ctx("boss_1", "boss")
+    for _ = 1, 5 do
+      local r = session.make_round({ key = "hjkl", variant = "mixed" }, c1, rng)
+      H.ok(#moves.other_moves(r.concepts) >= 2, r.sol.keys)
+    end
   end,
 }
 
@@ -191,8 +215,26 @@ cases[#cases + 1] = {
       return { tokens = t }
     end
     H.ok(session.clunky(sol("4l", "4l", "4l")))
+    H.ok(session.clunky(sol("2k", "4l", "4l", "l", "4l")))
     H.ok(not session.clunky(sol("4l", "4l", "x")))
     H.ok(not session.clunky(sol("3j", "4l", "4l")))
+  end,
+}
+
+cases[#cases + 1] = {
+  "alternatives that habit mode would block are spotted",
+  function()
+    local function sol(...)
+      local t = {}
+      for _, k in ipairs({ ... }) do
+        t[#t + 1] = { keys = k }
+      end
+      return { tokens = t }
+    end
+    H.ok(session.habit_breaking(sol("k", "k", "k", "l", "a␣bear<Esc>")))
+    H.ok(not session.habit_breaking(sol("k", "k", "l", "a␣bear<Esc>")))
+    H.ok(not session.habit_breaking(sol("3k", "3k", "3k")), "counted moves are the good habit")
+    H.ok(not session.habit_breaking(sol("x", "x", "x")), "x is not a habit key")
   end,
 }
 

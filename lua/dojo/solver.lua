@@ -92,6 +92,11 @@ end
 -- Solve a task.
 -- task: { kind = "move"|"edit", lines, cursor = {row, col}, goal = {row, col} | goal_lines }
 -- learned: set of move families
+-- the count a token repeats its move by: 4j -> 4, d2w -> 2, 3dd -> 3, w -> 1
+local function count_of(t)
+  return tonumber(t.keys:match("^(%d)") or t.keys:match("^[dc](%d)")) or 1
+end
+
 -- opts: { focus = { {fam, ...}, ... }, ban = function(token) -> bool, max_cost = n }
 -- returns { cost, keys, display, tokens, focus } or nil
 function M.solve(task, learned, opts)
@@ -225,12 +230,17 @@ function M.solve(task, learned, opts)
       end
       return (is_edit and t or "") .. "\0" .. row .. ":" .. col .. ":" .. cw
     end
+    -- Among equally short solutions: the stage's move, then fewer commands,
+    -- then smaller counts (2kwd$ reads better than 09bd$), then by keys.
     local function better(a, b)
       if a.focus ~= b.focus then
         return a.focus
       end
       if a.ntok ~= b.ntok then
         return a.ntok < b.ntok
+      end
+      if a.nsum ~= b.nsum then
+        return a.nsum < b.nsum
       end
       return a.keys < b.keys
     end
@@ -275,6 +285,7 @@ function M.solve(task, learned, opts)
         cw = v.curswant,
         cost = n.cost + t.cost,
         ntok = n.ntok + 1,
+        nsum = n.nsum + count_of(t),
         keys = n.keys .. t.keys,
         focus = n.focus or moves.matches(t, focus),
         parent = n,
@@ -319,6 +330,7 @@ function M.solve(task, learned, opts)
         h = 0,
         cost = n.cost + full.cost,
         ntok = n.ntok + 1,
+        nsum = n.nsum + count_of(t),
         keys = n.keys .. full.keys,
         focus = n.focus or moves.matches(t, focus),
         parent = n,
@@ -403,6 +415,7 @@ function M.solve(task, learned, opts)
       cw = task.cursor[2],
       cost = 0,
       ntok = 0,
+      nsum = 0,
       keys = "",
       focus = false,
     }
