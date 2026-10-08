@@ -1,18 +1,21 @@
 # Vim Dojo — Specification
 
-**Status:** prototype spec, version 0.4 (2026-10-07). This file is the source of
+**Status:** prototype spec, version 0.5 (2026-10-08). This file is the source of
 truth for how the game behaves. How to change it: see [AGENTS.md](AGENTS.md).
 Why things are the way they are: [docs/decisions/](docs/decisions/).
 
 ## 1. Summary
 
 Vim Dojo is a Neovim plugin that teaches Vim motions as a game: learn one move,
-drill it, then beat a timed challenge that mixes it with every move learned so
-far. Every round counts your keystrokes against **par**, the shortest solution
-using the moves you know. Stumbling through still passes; mastery earns stars.
+drill it alone and combined with what you know, then beat a timed challenge in
+which every round needs the new move. Each world ends with a boss that chains
+several moves. Every round counts your keystrokes against **par**, the shortest
+solution using the moves you know. Stumbling through still passes; mastery earns
+stars.
 
-The prototype has 14 stages in four worlds, about 45–60 minutes of play. It runs
-in a pinned, locked-down Docker container, or as a plugin in any Neovim ≥ 0.12.
+The prototype has 13 stages and 4 bosses in four worlds, about 60 minutes of
+play. It runs in a pinned, locked-down Docker container, or as a plugin in any
+Neovim ≥ 0.12.
 
 ## 2. Background and inspiration
 
@@ -33,7 +36,9 @@ copied; every source is credited in [docs/references.md](docs/references.md).
 
 Goals for the prototype:
 
-- Prove the loop: explainer, drill, timed challenge, with keystroke stars.
+- Prove the loop: explainer, drill, timed challenge, boss, with keystroke stars.
+- Apply, don't repeat: every challenge round needs the stage's new move, and
+  most combine it with moves learned before (docs/decisions/0008).
 - Never a puzzle: no round needs a move the player has not been shown.
 - Correct par every time: equal to the shortest solution using learned moves.
 - After every round, show the intended solution and up to two alternatives in
@@ -44,8 +49,9 @@ Goals for the prototype:
 Non-goals for this version:
 
 - Animated demos; key notation is enough.
-- Content beyond the 14 stages (text objects, search, yank/put, visual mode,
-  registers and macros come later).
+- New moves beyond the 13 stages (text objects, search, yank/put, visual mode,
+  registers and macros come later). Version 0.5 reworks the existing content
+  after the first playtest instead of adding moves.
 - Difficulty settings, sound, long-term statistics, spaced repetition.
 - Personal Neovim configs and custom keymaps; the game assumes stock Neovim.
 - Plain Vim.
@@ -53,36 +59,51 @@ Non-goals for this version:
 ## 4. Core loop
 
 Each stage teaches one move in three steps; passing its challenge unlocks the
-next stage.
+next stage. Each world ends with a boss; beating it opens the next world.
 
 1. **Explainer.** One screen: what the move does, its keys in Vim notation, a
-   before/after example and a tip. Shown automatically the first time; can be
-   reopened from the menu.
-2. **Drill.** 5 rounds that need the new move. No timer, free hints, and no
-   stage stars (each round still shows how close you were to par). Required
-   once before the challenge; replayable any time.
-3. **Challenge.** 8 timed rounds mixing every move learned so far. Earns 0–3
-   stars; 1 star unlocks the next stage.
+   before/after example, what it combines with, and a tip. Shown automatically
+   the first time; can be reopened from the menu.
+2. **Drill.** 6 untimed rounds in two parts: 3 *basics* that practise the new
+   move on its own, then 3 *combined* rounds where it follows or joins a move
+   you already know (`2je`, `jdw`). Free hints, no stage stars (each round still
+   shows how close you were to par). Required once before the challenge.
+   Stage 1.1 has nothing to combine with yet, so its drill is all basics.
+3. **Challenge.** 8 timed rounds. **Every round needs the new move**, and 5 of
+   them combine it with an earlier move (the rest are basics). Earns 0–3 stars;
+   1 star unlocks the next stage.
+4. **Boss** (end of each world). 10 timed rounds: 6 mixed rounds that combine
+   at least two different moves, then 4 *chains* of 2–3 steps (go here, then
+   change that, then go there). Every round needs at least one move from this
+   world. Beating it (1 star) unlocks the next world. The summary shows how you
+   did per move and names your weakest one.
 
 ```mermaid
 flowchart LR
-  E[Explainer<br/>keys + example] --> D[Drill<br/>5 rounds, no clock]
-  D --> C[Challenge<br/>8 timed rounds]
+  E[Explainer<br/>keys, example, combos] --> D[Drill<br/>3 basics + 3 combined]
+  D --> C[Challenge<br/>8 timed rounds, all use the new move]
   C --> P{1+ star?}
   P -- no: retry --> C
-  P -- yes --> N[Next stage<br/>new move unlocked]
-  N -- next move --> E
+  P -- yes --> N{last stage<br/>of the world?}
+  N -- no --> E
+  N -- yes --> B[Boss<br/>6 mixed + 4 chains]
+  B --> Q{1+ star?}
+  Q -- no: retry --> B
+  Q -- yes --> W[Next world]
 ```
 
-Every challenge is cumulative, so each one already works as a "boss level" for
-everything before it. Stages are grouped into worlds only for the menu. Any
-unlocked stage can be replayed to improve its stars; the best result is kept.
+**Skip ahead.** A world's boss can be played as soon as the world's first stage
+is unlocked. Beating it unlocks every stage of that world and the next world,
+so players who already know the basics don't have to grind them
+(docs/decisions/0009). Any unlocked stage or boss can be replayed to improve its
+stars; the best result is kept.
 
-**Challenge composition** (8 rounds): 4 use the new stage's move. From stage 2.4
-on, 2 are two-step rounds (see §5). The rest are drawn uniformly from earlier
-stages, generated with everything learned so far, so old moves meet new ones
-(for example a `d{motion}` round may need `dt,` once `t` is known). Stage 1.1
-draws all 8 from itself. Order is shuffled.
+**What "combined" means.** The solver reports which move families its intended
+solution uses (§9 Concept tags). A round is *combined* when that solution uses
+the stage's move plus at least one other move family; counts alone don't count,
+because they modify a move rather than add one (`3w` is a basic `w` round,
+`2je` is a combined `e` round). Rounds that don't meet their requirement are
+thrown away and regenerated.
 
 ## 5. Rounds
 
@@ -98,8 +119,15 @@ and the next round starts on its own.
   highlighted, and the goal line is shown as a ghost line under it. Checked:
   text only, so where the cursor ends up does not matter. Undo (`u`) is allowed
   and costs keys like anything else.
-- *Two-step rounds:* in challenges from stage 2.4 on, the target is on another
-  line, so solving it needs a vertical and a horizontal move (`3j` then `2w`).
+- *Combined rounds:* a basic round placed in a taller buffer, with the cursor
+  starting on another line or further away, so the new move has to follow an
+  earlier one (`3jA` for `A`, `2j$` for `$`). Some stages have their own
+  combined rounds too, such as `df,` and `ct)` for `f` and `t`.
+- *Chains* (bosses only): 2–3 steps on different lines of one buffer, each a
+  move or an edit, done in order. Only the current step is highlighted and the
+  header shows `step 2/3`. The round ends after the last step. Its par is the
+  sum of the steps' pars along the intended path, so finishing a step somewhere
+  else can make a later step a key longer or shorter.
 
 **Randomness.** Every round comes from a seeded generator: words from a word
 list, start and target positions, distances, target characters. Constraints
@@ -117,9 +145,10 @@ notation: `3w` is 2, `f(` is 2, `cwbar<Esc>` is 6, `W` is 1. `:` commands count
 every character including `<CR>`. Not counted: `<Esc>` pressed while already in
 Normal mode, the game's control keys, and keys blocked by habit mode.
 
-**Timer.** Challenges only. The limit is 5 s plus 1 s per key of par: `3w` gets
-7 s, `ct)foo<Esc>` gets 12 s. The countdown in the header turns to a warning
-color in the last 2 s, and each challenge opens with a 3-2-1 countdown.
+**Timer.** Challenges and bosses only. The limit is 4 s plus 0.7 s per key of
+par: `3w` gets 5.4 s, `ct)foo<Esc>` gets 8.9 s, a chain with a total par of 14
+gets 13.8 s. The countdown in the header turns to a warning color in the last
+2 s, and each challenge or boss opens with a 3-2-1 countdown.
 
 **Controls during a round.**
 
@@ -133,12 +162,12 @@ and scrolling are ignored during rounds (keyboard only, and a click would beat
 par). Leaving the game's tab stops the running drill or challenge, and `:Dojo`
 during a round goes back to the menu.
 
-**Habit mode** (optional, after delaytrain.nvim). Off by default; toggled with
-`H` in the menu and saved. In stages where counts are already learned (2.4 and
-later, including their challenges), pressing the same one of `h j k l w b e` a
-third time within 1 s is blocked: the key does nothing, is not counted, and the
-header suggests the counted form. Before counts are taught it never blocks,
-because repeating keys is then the correct answer.
+**Habit mode** (after delaytrain.nvim). On by default; toggled with `H` in the
+menu and saved (docs/decisions/0011). It acts only in challenges and bosses of
+stages where counts are already learned (1.2 and later); drills stay forgiving.
+Pressing the same one of `h j k l w b e` a third time within 1 s is blocked: the
+key does nothing, is not counted, and the header suggests the counted form. The
+character after `f`, `t`, `r` and similar is never blocked.
 
 ## 6. Scoring
 
@@ -161,10 +190,11 @@ shown as "under par".
 | Solved with more keys, or with the hint | 1 |
 | Time ran out | 0 |
 
-**Challenge stars.** The challenge score is the average of its round stars
+**Challenge and boss stars.** The score is the average of the round stars
 (0 to 3).
 
-- 1 star (pass): at least 75 % of rounds solved (6 of 8). Unlocks the next stage.
+- 1 star (pass): at least 75 % of rounds solved (6 of 8; 8 of 10 for a boss).
+  Unlocks the next stage, or for a boss the next world.
 - 2 stars: pass, and a score of 2.0 or more.
 - 3 stars: pass, and a score of 2.75 or more (for example 6 rounds at par and 2
   at par + 1).
@@ -173,6 +203,11 @@ shown as "under par".
 or more identical presses of `h j k l w b e x` in a round produces a hint naming
 the counted form, for example `jjjj → 4j`. It appears with the round's result
 and in the summary.
+
+**Concept report** (bosses). Every round's intended solution is tagged with the
+move families it uses. The boss summary lists each family that appeared in at
+least two rounds with its average stars, and names the weakest one together with
+the stage that teaches it.
 
 **Feedback.** After a success the next round starts after 0.4 s; after a fail,
 after 1.5 s. The result stays in the header during the next round: stars, your
@@ -185,44 +220,56 @@ challenge lists each round: your keys, the intended solution and alternatives.
 
 The order follows vimtutor's first three lessons, regrouped by the size of the
 move as learn-vim does, plus `f`/`t`, which vimtutor leaves out but every other
-source treats as essential. Explainer texts are written for this game.
+source treats as essential. Counts come right after `hjkl`, so par never
+rewards pressing a key several times in a row (docs/decisions/0012). Explainer
+texts are written for this game.
+
+Distances stay *glanceable*: vertical targets use the relative line numbers (2
+to 8 lines), word targets are at most 4 words away and character counts at most
+4, so the count can be seen rather than counted.
 
 **World 1 · First steps** (vimtutor lesson 1)
 
-| Stage | Keys | Round kind | Rounds look like |
-| --- | --- | --- | --- |
-| 1.1 | `h` `j` `k` `l` | move | Target 1 to 3 cells away, sometimes in two directions |
-| 1.2 | `x` | edit | Delete 1 to 3 highlighted stray letters |
-| 1.3 | `i` `a` | edit | Insert a missing word or letters next to the cursor |
-| 1.4 | `A` `I` | edit | Add a missing word at the end or start of the line |
+| Stage | Key | Keys | Round kind | Basic rounds | Combined rounds |
+| --- | --- | --- | --- | --- | --- |
+| 1.1 | `hjkl` | `h` `j` `k` `l` | move | Target 1 to 3 cells away, sometimes in two directions | none (nothing to combine with yet) |
+| 1.2 | `counts` | `4j` `3l` | move | 2 to 8 lines up or down, or 2 to 4 cells sideways | both at once: `3j2l` |
+| 1.3 | `x` | `x` `3x` | edit | Delete 1 to 4 highlighted stray letters | reach them first: `j2lx` |
+| 1.4 | `insert` | `i` `a` | edit | Insert a missing word or letters next to the cursor | reach the spot first: `3li…` |
+| 1.5 | `append` | `A` `I` | edit | Add a missing word at the end or start of the line | on another line: `2jA…` |
+| 1.B | `boss_1` | — | mixed, chains | | |
 
 **World 2 · Words and lines** (vimtutor 2.3–2.4, learn-vim chapter 1)
 
-| Stage | Keys | Round kind | Rounds look like |
-| --- | --- | --- | --- |
-| 2.1 | `w` `b` | move | Start of a word 1 to 4 words away, either direction |
-| 2.2 | `e` | move | Last letter of a word 1 to 4 words ahead |
-| 2.3 | `0` `^` `$` | move | Start, first non-blank (indented lines) or end of the line |
-| 2.4 | counts: `4j` `3w` `3x` | move, edit | Targets 3 to 8 lines or 3 to 6 words away; 3 to 4 stray letters |
+| Stage | Key | Keys | Round kind | Basic rounds | Combined rounds |
+| --- | --- | --- | --- | --- | --- |
+| 2.1 | `word` | `w` `b` | move | Start of a word 1 to 4 words away | on another line: `2j3w` |
+| 2.2 | `word_end` | `e` | move | Last letter of a word 1 to 4 words ahead | `je`, `we` |
+| 2.3 | `line_edges` | `0` `^` `$` | move | Start, first non-blank (indented lines) or end of the line | `3j$`, `k^` |
+| 2.B | `boss_2` | — | mixed, chains | | |
 
 **World 3 · Operators** (vimtutor 2.1–2.6, 3.3–3.4)
 
-| Stage | Keys | Round kind | Rounds look like |
-| --- | --- | --- | --- |
-| 3.1 | `d{motion}`: `dw` `de` `d$` `d0` `db` `d2w` | edit | Delete a highlighted span that one learned motion covers |
-| 3.2 | `dd` `3dd` | edit | Delete 1 to 4 highlighted lines |
-| 3.3 | `c{motion}`: `cw` `ce` `c$` | edit | Replace a highlighted word or line end with the goal text; the explainer covers the trap that `cw` acts like `ce` |
+| Stage | Key | Keys | Round kind | Basic rounds | Combined rounds |
+| --- | --- | --- | --- | --- | --- |
+| 3.1 | `delete` | `dw` `de` `d$` `d0` `db` `d2w` | edit | Delete a span that one learned motion covers (operator + motion is already a combination) | reach it first: `jwdw` |
+| 3.2 | `change` | `cw` `ce` `c$` | edit | Replace a word or line end with the goal text; the explainer covers `cw` acting like `ce` | `2jcw…` |
+| 3.3 | `lines` | `dd` `3dd` `cc` `dj` | edit | Delete or rewrite 1 to 4 whole lines | from another line: `2jdd` |
+| 3.B | `boss_3` | — | mixed, chains | | |
 
 **World 4 · Find in the line** (learn-vim chapter 2, hardtime's workflow)
 
-| Stage | Keys | Round kind | Rounds look like |
-| --- | --- | --- | --- |
-| 4.1 | `f` `F` | move | A character 6 to 40 columns away on a code-like line |
-| 4.2 | `t` `T` | move | The cell just before or after a punctuation mark |
-| 4.3 | `dt,` `df)` `ct)` | edit | Delete or change up to a punctuation mark, 4 to 18 columns away |
+| Stage | Key | Keys | Round kind | Basic rounds | Combined rounds |
+| --- | --- | --- | --- | --- | --- |
+| 4.1 | `find` | `f` `F` | move | A character 6 to 40 columns away on a code-like line | with operators: `df,` `cf)…`; or `jf(` |
+| 4.2 | `till` | `t` `T` | move | The cell just before or after a punctuation mark | with operators: `dt,` `ct)…`; or `kt;` |
+| 4.B | `boss_4` | — | mixed, chains | | |
+
+The old stage 4.3 ("operators meet find") is gone: its rounds are now the
+combined rounds of 4.1 and 4.2 and part of the World 4 boss.
 
 Long hops with `l` stop being the best answer once `w`, `e` and `f` arrive. The
-solver picks that up on its own, so older stages get harder in later challenges
+solver picks that up on its own, so older moves get harder in later rounds
 without extra content.
 
 ## 8. Screens
@@ -232,21 +279,23 @@ fit an 80 × 24 terminal. Layouts show content and placement, not final wording.
 
 **Menu.** Opens with `:Dojo`. `j`/`k` (and `gg`/`G`) move between stages;
 `<CR>` continues the stage from where it is: explainer, then drill, then
-challenge. Returning to the menu puts the cursor back on the stage just played.
+challenge (bosses: explainer, then the boss). Returning to the menu puts the
+cursor back on the stage just played. The key help sits in the status line so
+all 17 entries fit in 22 rows.
 
 ```
- VIM DOJO                                     8 / 42 ★   habit mode: off
-
+ VIM DOJO                                   12 / 51 ★   habit mode: on
  World 1 · First steps
-     1.1  h j k l        ★★★
-     1.2  x              ★★★
-     1.3  i a            ★★☆
-   > 1.4  A I            ☆☆☆   new
+     1.1  h j k l     Move by cells          ★★★
+     1.2  counts      Repeat with a count    ★★☆
+     1.3  x           Delete characters      ★☆☆
+     1.4  i a         Insert text            ☆☆☆   new
+     1.5  A I         Add at line ends       locked
+     1.B  Boss        Mixes and chains       ☆☆☆   skip ahead
  World 2 · Words and lines
-     2.1  w b            locked
+     2.1  w b         Jump by words          locked
  ...
-
- <CR> play   d drill   c challenge   ? explainer   H habit mode   q quit
+ <CR> play  d drill  c challenge  ? explainer  H habit mode  q quit   (status line)
 ```
 
 **Explainer.** One screen per stage; brackets mark the cursor in examples.
@@ -258,17 +307,27 @@ challenge. Returning to the menu puts the cursor back on the stage just played.
  b     back to the start of the previous word
 
  Example
-     [t]he quick brown fox jumps
-     ww
-     the quick [b]rown fox jumps
+   before  [t]he quick brown fox jumps
+   type    ww
+   after   the quick [b]rown fox jumps
 
- Tip: watch the word starts, not the letters.
+ Combines with
+   3w      counts: three words
+   2j3w    down two lines, then three words
+
+ Tip: count the word starts, not the letters.
 
  <CR> start the drill      q menu
 ```
 
+**Boss explainer.** Lists the world's moves, what the rounds look like and a
+"which move when" guide (after hardtime.nvim's recommended workflow): up/down
+with a count and `j`/`k`, a few cells with `h`/`l`, word starts and ends with
+`w b e`, line edges with `0 ^ $`, a specific character with `f t`.
+
 **Round.** The header sits in its own window above the play buffer; it cannot
-be focused or edited. The play buffer holds only the task text, with relative
+be focused or edited. Its first line names the part: `Drill · basics`,
+`Drill · combined`, `Challenge` or `Boss`, and `step 2/3` in chains. The play buffer holds only the task text, with relative
 line numbers. The target is highlighted (not visible in this sketch).
 
 ```
@@ -282,21 +341,31 @@ line numbers. The target is highlighted (not visible in this sketch).
    3  et dolore magna aliqua ut enim ad minim veniam
 ```
 
-**Summary.** After every drill and challenge; the main learning moment.
+**Summary.** After every drill, challenge and boss; the main learning moment.
+A boss summary adds the concept report:
 
 ```
- 2.4 counts · Challenge complete                   ★★☆   score 2.25
+ Moves          rounds   stars
+ w b               4     ★★★
+ e                 3     ★★☆
+ 0 ^ $             3     ★☆☆   weakest: replay 2.3
+```
+
+A stage summary looks like this:
+
+```
+ 2.1 w b · Challenge complete                      ★★☆   score 2.25
 
  Solved 7/8 · at par 4/8 · average 3.4 s · seed 48121
 
-  #   your keys    par   intended   also works    stars
-  1   3w           2     3w         www           ★★★
-  2   jjjjj        2     5j         –             ★     jjjjj → 5j
-  3   jjjww        4     3j2w       3jww          ★★    jjj → 3j
-  4   wwww         2     5w         –             time out
+  #  your keys       par  intended       also works        stars
+  1  3w              2    3w             www               ★★★
+  2  jjww            3    j2w            jww               ★★☆
+  3  bbbb            2    4b             –                 ★☆☆  bbbb → 4b
+  4  ww              4    2j2w           –                 time out
   …
 
- r retry      n next stage      m menu
+ n next stage   r retry   m menu
 ```
 
 ## 9. Technical design
@@ -335,6 +404,10 @@ Vim's motion rules, which is where hand-written par goes wrong (`cw` acting like
   `f`/`t` only target characters at the edges of the changed text.
 - Ties are broken by: uses the round's focus move, then fewer commands, then key
   order.
+- **Concept tags.** Every candidate key carries the move families it uses
+  (`d2w` uses `d`, `w b` and counts), so a solution's families are known. That
+  is what checks "uses the new move", "combined" and "uses a move from this
+  world", and what the boss concept report is built on.
 - Alternatives: the same search with the intended solution's main move banned,
   and with counts banned.
 - Measured on 0.12.5: the slowest of 200 rounds per stage takes under 200 ms
@@ -343,10 +416,16 @@ Vim's motion rules, which is where hand-written par goes wrong (`cw` acting like
 
 **What happens in a round.**
 
-1. The stage's generator builds the lines, start cursor and goal from a seed.
-2. The solver returns par, the intended solution and alternatives. The session
-   retries generation if a constraint fails (no solution within the cost limit,
-   or a drill round whose best solution skips the new move).
+1. The session plans the rounds (basic, combined, mixed or chain) and asks the
+   stage's generator for a task: its basic generator, its own combined
+   generator if it has one, or the basic task passed through the generic
+   *combine* step (taller buffer, cursor moved away). Chains stack single-line
+   tasks from several stages on separate lines of one buffer.
+2. The solver returns par, the intended solution, its concept tags and
+   alternatives. The session retries generation if a requirement fails: no
+   solution within the cost limit, the new move missing, "combined" not met,
+   or no move from the boss's world. Chains are solved step by step along the
+   intended path.
 3. The round runner shows the buffer and header, records typed keys with
    `vim.on_key`, runs the timer, and checks the state after each key.
 4. The scorer turns keys, time and hint use into round stars and habit hints;
@@ -360,30 +439,40 @@ Vim's motion rules, which is where hand-written par goes wrong (`cw` acting like
 | `plugin/dojo.lua` | Defines `:Dojo` |
 | `lua/dojo/init.lua` | `setup(opts)` and `open()` |
 | `lua/dojo/config.lua` | All tunable defaults (§10) |
-| `lua/dojo/curriculum.lua` | Worlds, stages, their order, learned moves |
-| `lua/dojo/stages/s<world>_<n>.lua` | One file per stage: explainer and round generator (`twostep.lua` for two-step rounds, `util.lua` helpers) |
+| `lua/dojo/curriculum.lua` | Worlds, stages, bosses, their order, display ids, learned moves, unlock rules |
+| `lua/dojo/stages/<key>.lua` | One file per stage, named by its stable key: explainer and round generators (`boss.lua` builds the four bosses, `util.lua` helpers) |
+| `lua/dojo/compose.lua` | The generic combine step and chain building |
 | `lua/dojo/solver.lua` | Par, intended solution, alternatives |
 | `lua/dojo/moves.lua` | Move families and the candidate keys they allow |
 | `lua/dojo/round.lua` | One round: buffer, key capture, habit mode, timer, completion check |
-| `lua/dojo/session.lua` | Drill and challenge sequencing |
-| `lua/dojo/score.lua` | Star rules, habit hints |
+| `lua/dojo/session.lua` | Drill, challenge and boss sequencing, round requirements |
+| `lua/dojo/score.lua` | Star rules, habit hints, concept report |
 | `lua/dojo/ui/*.lua` | Layout, menu, explainer, header and summary screens |
 | `lua/dojo/progress.lua` | Saving and loading progress, round log |
 | `lua/dojo/rng.lua`, `words.lua`, `text.lua`, `keys.lua` | Seeded random numbers, word list, line builders, key display |
 | `tests/` | Headless test suite (`nvim -l tests/run.lua`) |
 | `docker/`, `compose.yaml` | Container image and services |
 
-**Stage files** are the main extension point. Each returns a table with `id`,
+**Stage files** are the main extension point. Each returns a table with `key`
+(stable, used for saved progress; display ids like `2.1` come from the order),
 `title`, `name`, `kind`, `adds` (move families it teaches), `focus` (which
-families a solution must use), `explainer`, and `generate(rng, ctx)`. That
-function returns `{kind, lines, cursor, goal}` where `goal` is a cursor for
-move rounds or goal lines for edit rounds, plus a one-line `prompt`. `ctx` says
-which families are learned and whether it is a drill or a challenge.
+families a solution must use), `explainer` (with `combos`), `generate(rng, ctx)`
+for basic rounds and optionally `combined(rng, ctx)`. A generator returns
+`{kind, lines, cursor, goal}` where `goal` is a cursor for move rounds or goal
+lines for edit rounds, plus a one-line `prompt`. `ctx` says which families are
+learned and the mode. Single-line tasks can serve as chain steps.
 
-**Saved data** lives in `stdpath('data')/dojo/`. `progress.json` holds, per
-stage: explainer seen, drill done, best stars, best score, attempts; plus
-settings (habit mode). `rounds.jsonl` logs every round (stage, mode, seed, keys,
-par, time, result) for statistics later.
+**Saved data** lives in `stdpath('data')/dojo/`. `progress.json` (version 2)
+holds, per stage key: explainer seen, drill done, best stars, best score,
+attempts; plus settings (habit mode). Version 1 files, keyed by the old stage
+numbers, are migrated on load: each stage keeps its stars under its new key,
+old 4.3 is dropped (docs/decisions/0010). `rounds.jsonl` logs every round
+(stage, mode, round kind, seed, keys, par, concepts, time, result).
+
+**Unlock rules.** A stage is unlocked when it is the first one, when the entry
+before it (stage or boss) has at least 1 star, when it has a star itself (for
+example after migration), or when its world's boss has been beaten. A boss is
+unlocked as soon as its world's first stage is.
 
 **Docker.** No network, read-only filesystem, no capabilities, non-root user, a
 data volume. The plugin is copied from the repo at build time. Services:
@@ -392,11 +481,15 @@ the suite).
 
 **Tests** run headless with `nvim -l tests/run.lua`, a small runner of our own.
 
-- Every stage, 200 seeds (drill and challenge context): the intended solution
-  replays to the goal and is par keys long; drill solutions use the stage's
-  move; two-step rounds need at least two moves. For 10 rounds per stage,
+- Every stage, 200 seeds per round kind (basic, combined): the intended
+  solution replays to the goal and is par keys long; it uses the stage's move;
+  combined rounds use another move family as well. For 10 rounds per stage,
   every alternative replays too. Replays use `normal!`; real typed keys are
   covered by the round runner tests.
+- Every boss, 50 mixed rounds and 50 chains: each uses a move from its world,
+  mixed rounds combine two move families, and chains replay step by step.
+- Progress migration from version 1, unlock rules including skip ahead, and the
+  concept report's weakest move.
 - Solver cases with known answers (`3w`, `$`, `3kw`, `dt,`, `cebar<Esc>`).
 - Round runner: keys fed with `nvim_feedkeys`, asserting key count, success,
   timeout and habit-mode blocking.
@@ -416,44 +509,48 @@ through `require("dojo").setup()`, because playtesting will move most of them.
 
 | Setting | Default |
 | --- | --- |
-| Rounds per drill | 5 |
-| Rounds per challenge | 8 |
-| Challenge rounds using the new move | 4 of 8 |
-| Two-step rounds per challenge (from stage 2.4) | 2 of 8 |
-| Time limit per challenge round | 5 s + 1 s per par key |
+| Drill rounds | 3 basics + 3 combined |
+| Challenge rounds | 8, all with the new move, 5 of them combined |
+| Boss rounds | 10: 6 mixed + 4 chains of 2, 2, 3 and 3 steps |
+| Time limit per timed round | 4 s + 0.7 s per par key |
 | Warning color | last 2 s |
 | 2-star round | up to par + 2 keys |
-| Pass (1 star, unlocks next stage) | 75 % of rounds solved |
+| Pass (1 star, unlocks the next entry) | 75 % of rounds solved |
 | 2-star challenge | pass and score ≥ 2.0 |
 | 3-star challenge | pass and score ≥ 2.75 |
-| Hint in a challenge | round earns at most 1 star |
+| Hint in a challenge or boss | round earns at most 1 star |
 | Pause after a success / fail | 0.4 s / 1.5 s |
-| Habit mode | off; blocks 3rd press within 1000 ms |
+| Habit mode | on in challenges and bosses once counts are learned; blocks the 3rd press within 1000 ms |
 | Habit hint | run of 3+ identical presses |
-| Solver cost limit | 10 keys for move rounds, 16 for edit rounds |
+| Word and character distances | up to 4 |
+| Solver cost limit | 10 keys for move rounds, 16 for edit rounds and chain steps |
 | Counts the solver tries | 2–9 for `j k w b e`, 2–4 for `h l x` |
-| Seeds per stage in tests | 200 |
+| Seeds per stage in tests | 200 per round kind |
+
+The number of combined rounds in a challenge is the main lever for a future
+difficulty setting.
 
 ## 11. Acceptance criteria
 
-The prototype is done when all of these hold:
+Version 0.5 is done when all of these hold:
 
 - [ ] `docker compose run --rm dojo` opens the menu; on first start only stage
-  1.1 is unlocked.
-- [ ] All 14 stages play end to end: explainer, drill, challenge, summary.
-- [ ] A passed challenge unlocks the next stage, and progress survives
-  restarting the container.
-- [ ] Every round shows the target, par and learned moves, plus the countdown in
-  challenges.
+  1.1 and the World 1 boss are unlocked; all 17 entries fit at 80 × 24.
+- [ ] All 13 stages play end to end: explainer, drill (basics then combined),
+  challenge, summary; all 4 bosses: explainer, boss, summary with concept
+  report.
+- [ ] Every challenge round uses the stage's move; at least 5 of 8 are combined
+  where the stage can combine; boss rounds use a move from their world.
+- [ ] Chains highlight one step at a time and end after the last step.
+- [ ] Beating a boss unlocks its world and the next one; progress from version
+  0.4 keeps its stars.
 - [ ] After every round and in every summary: your keys, the intended solution
   and alternatives.
-- [ ] Test suite passes locally and in CI: every stage solvable at par across
-  200 seeds, and drills always need the new move.
-- [ ] Solver stays within budget, measured in the tests.
-- [ ] A full playthrough leaves no errors in `:messages`; the layout works at
-  80 × 24.
-- [ ] Habit mode blocks repeats only where counts are learned; habit hints
-  appear in results and summaries.
+- [ ] Test suite passes locally and in CI, including the 200-seed stage tests
+  and the boss tests; solver within budget.
+- [ ] A full playthrough leaves no errors in `:messages`.
+- [ ] Habit mode is on by default, blocks only in challenges and bosses where
+  counts are learned, and can be turned off with `H`.
 
 ## 12. Open questions
 
@@ -478,9 +575,10 @@ stage files:
 5. Registers and marks, then macros.
 6. Bigger moves: `W` `B` `E` with punctuation, `ge`, `{` `}`.
 
-Alongside: difficulty tiers with a tighter clock, a habit report across
-sessions from the round log (like `:Hardtime report`), and practice rounds built
-from your weakest moves.
+Alongside: difficulty tiers (more combined rounds, longer chains, a tighter
+clock), a habit report across sessions from the round log (like
+`:Hardtime report`), and practice rounds built from your weakest moves, which
+the boss concept report already identifies.
 
 ## Spec history
 
@@ -490,3 +588,4 @@ from your weakest moves.
 | 0.2 | 2026-10-07 | Moved into the repo; curriculum reordered after vimtutor (14 stages); habit mode and hints; solver details; CI |
 | 0.3 | 2026-10-07 | From building and the first playtest: count limits for `h l x`, solver pruning, `:q` and menu focus behavior, stage file names |
 | 0.4 | 2026-10-07 | From an independent code review: full per-round feedback, mouse ignored, leaving the tab stops a round, two-step rounds need two moves, test wording matches what is tested |
+| 0.5 | 2026-10-08 | From the owner's playtest (docs/playtests/2026-10-08-owner.md): every challenge round uses the new move and most combine it; drills get a combined part; bosses with chains, skip ahead and a concept report; counts move to 1.2; `dd` becomes a whole-lines stage after `c`; 4.3 folded into 4.1/4.2; tighter clock; glanceable distances; habit mode on by default in challenges; stable stage keys with progress migration |
