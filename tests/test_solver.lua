@@ -121,6 +121,20 @@ return {
     end,
   },
   {
+    "operators stay on the cursor's line: no cb from column 0 into the line above",
+    function()
+      local t = edit(
+        { "lens duck inch water apple box", "call(baby.sea, army);" },
+        { 2, 0 },
+        { "lens duck inch water apple mark", "call(baby.sea, army);" }
+      )
+      local r = solver.solve(t, H.learned({ "hjkl", "count", "wb", "e", "line", "c" }))
+      H.ok(r, "solvable")
+      H.ok(not r.keys:find("^0?cb"), "crosses lines: " .. r.keys)
+      H.eq(r.keys, "bc$mark\27", "moving back a word across lines is fine")
+    end,
+  },
+  {
     "2x beats xx on ties (fewer commands)",
     function()
       local t = edit({ "the brxqown fox" }, { 1, 6 }, { "the brown fox" })

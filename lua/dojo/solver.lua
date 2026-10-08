@@ -92,6 +92,28 @@ end
 -- Solve a task.
 -- task: { kind = "move"|"edit", lines, cursor = {row, col}, goal = {row, col} | goal_lines }
 -- learned: set of move families
+-- Does an edit leave every line but `row` alone? A charwise operator can
+-- reach into another line (cb from column 0 changes the word at the end of
+-- the line above). That is legal Vim but not what the game teaches, so the
+-- solver leaves such edits out; j/k and line edges are line-wise anyway.
+local function on_row(old, new, row)
+  local ol = vim.split(old, "\n", { plain = true })
+  local nl = vim.split(new, "\n", { plain = true })
+  if #ol ~= #nl then
+    return false
+  end
+  for i = 1, #ol do
+    if i ~= row and ol[i] ~= nl[i] then
+      return false
+    end
+  end
+  return true
+end
+
+local function charwise_operator(t)
+  return (t.fams.d or t.fams.c) and not t.rowlevel
+end
+
 -- the count a token repeats its move by: 4j -> 4, d2w -> 2, 3dd -> 3, w -> 1
 local function count_of(t)
   return tonumber(t.keys:match("^(%d)") or t.keys:match("^[dc](%d)")) or 1
@@ -321,6 +343,9 @@ function M.solve(task, learned, opts)
       if typed:find("[\n`]") then
         return
       end
+      if charwise_operator(t) and not on_row(n.text, rest, n.row) then
+        return
+      end
       local full = { keys = t.keys .. typed .. "\27", cost = t.cost + #typed + 1, fams = t.fams, typed = typed }
       push({
         text = goal,
@@ -388,7 +413,7 @@ function M.solve(task, learned, opts)
           then
             run(n, t.keys)
             local nt = buffer_text()
-            if nt ~= n.text and ok_text(nt) then
+            if nt ~= n.text and ok_text(nt) and not (charwise_operator(t) and not on_row(n.text, nt, n.row)) then
               push(child(n, t, nt, vim.fn.winsaveview()))
             end
           end

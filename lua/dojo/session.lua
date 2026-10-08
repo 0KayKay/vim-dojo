@@ -112,6 +112,10 @@ local function stage_task(st, variant, rng, gctx)
   end
   local t = st.combined and st.combined(rng, gctx)
   if t then
+    -- half the time, also start somewhere else: 2jdt, rather than dt, alone
+    if #t.lines == 1 and rng:chance(0.5) then
+      return compose.combine(t, rng, gctx)
+    end
     return t
   end
   local base = st.generate(rng, gctx)
