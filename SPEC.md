@@ -514,7 +514,11 @@ the suite).
   concept report's weakest move.
 - Solver cases with known answers (`3w`, `$`, `3kw`, `dt,`, `cebar<Esc>`).
 - Round runner: keys fed with `nvim_feedkeys`, asserting key count, success,
-  timeout and habit-mode blocking.
+  timeout and habit-mode blocking; chains step by step, including the column
+  `j`/`k` remember between steps.
+- End to end: every stage (drill and challenge) and every boss, with fixed
+  seeds, played by typing the intended solutions as a player would (chain
+  steps one at a time, habit mode on): each reaches its summary with 3 stars.
 - Star rules, unlock rule, saving then loading progress.
 - Generation time per round: the budget is 500 ms; the test fails above
   800 ms (per step in chains) to allow for slow CI machines, and prints the
