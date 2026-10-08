@@ -1,6 +1,6 @@
 # Vim Dojo — Specification
 
-**Status:** prototype spec, version 0.2 (2026-10-07). This file is the source of
+**Status:** prototype spec, version 0.4 (2026-10-07). This file is the source of
 truth for how the game behaves. How to change it: see [AGENTS.md](AGENTS.md).
 Why things are the way they are: [docs/decisions/](docs/decisions/).
 
@@ -58,8 +58,9 @@ next stage.
 1. **Explainer.** One screen: what the move does, its keys in Vim notation, a
    before/after example and a tip. Shown automatically the first time; can be
    reopened from the menu.
-2. **Drill.** 5 rounds that need the new move. No timer, free hints, no stars.
-   Required once before the challenge; replayable any time.
+2. **Drill.** 5 rounds that need the new move. No timer, free hints, and no
+   stage stars (each round still shows how close you were to par). Required
+   once before the challenge; replayable any time.
 3. **Challenge.** 8 timed rounds mixing every move learned so far. Earns 0–3
    stars; 1 star unlocks the next stage.
 
@@ -125,10 +126,12 @@ color in the last 2 s, and each challenge opens with a 3-2-1 countdown.
 | Key | Action |
 | --- | --- |
 | `<Tab>` | Hint: shows the intended solution. In a challenge, that round can then earn at most 1 star. |
-| `:q` | Back to the menu. An unfinished drill or challenge is discarded. |
+| `:q` | Back to the menu (it closes the play window; the header window becomes the menu). An unfinished drill or challenge is discarded. |
 
-Everything else is plain Neovim, with relative line numbers on and the mouse
-off.
+Everything else is plain Neovim, with relative line numbers on. Mouse clicks
+and scrolling are ignored during rounds (keyboard only, and a click would beat
+par). Leaving the game's tab stops the running drill or challenge, and `:Dojo`
+during a round goes back to the menu.
 
 **Habit mode** (optional, after delaytrain.nvim). Off by default; toggled with
 `H` in the menu and saved. In stages where counts are already learned (2.4 and
@@ -172,9 +175,10 @@ the counted form, for example `jjjj → 4j`. It appears with the round's result
 and in the summary.
 
 **Feedback.** After a success the next round starts after 0.4 s; after a fail,
-the intended solution is shown and the next round starts after 1.5 s. The
-previous round's result stays in the header during the next one, for example
-`✓ 3 keys · par 2 · ★★ · intended 3w`. The summary after every drill and
+after 1.5 s. The result stays in the header during the next round: stars, your
+keys, par with the intended solution, and up to two alternatives, for example
+`✓ ★★☆ 3 keys · you www · par 2: 3w · also 3e`. Alternatives appear a moment
+later, once computed. The summary after every drill and
 challenge lists each round: your keys, the intended solution and alternatives.
 
 ## 7. Curriculum
@@ -199,7 +203,7 @@ source treats as essential. Explainer texts are written for this game.
 | 2.1 | `w` `b` | move | Start of a word 1 to 4 words away, either direction |
 | 2.2 | `e` | move | Last letter of a word 1 to 4 words ahead |
 | 2.3 | `0` `^` `$` | move | Start, first non-blank (indented lines) or end of the line |
-| 2.4 | counts: `4j` `3w` `3x` | move, edit | Targets 3 to 9 lines or words away; 3 to 5 stray letters |
+| 2.4 | counts: `4j` `3w` `3x` | move, edit | Targets 3 to 8 lines or 3 to 6 words away; 3 to 4 stray letters |
 
 **World 3 · Operators** (vimtutor 2.1–2.6, 3.3–3.4)
 
@@ -215,7 +219,7 @@ source treats as essential. Explainer texts are written for this game.
 | --- | --- | --- | --- |
 | 4.1 | `f` `F` | move | A character 6 to 40 columns away on a code-like line |
 | 4.2 | `t` `T` | move | The cell just before or after a punctuation mark |
-| 4.3 | `dt,` `df)` `ct)` `cf,` | edit | Delete or change up to a punctuation mark |
+| 4.3 | `dt,` `df)` `ct)` | edit | Delete or change up to a punctuation mark, 4 to 18 columns away |
 
 Long hops with `l` stop being the best answer once `w`, `e` and `f` arrive. The
 solver picks that up on its own, so older stages get harder in later challenges
@@ -226,8 +230,9 @@ without extra content.
 All screens are plain text inside Neovim, in their own tab page, laid out to
 fit an 80 × 24 terminal. Layouts show content and placement, not final wording.
 
-**Menu.** Opens with `:Dojo`. `<CR>` continues the stage from where it is:
-explainer, then drill, then challenge.
+**Menu.** Opens with `:Dojo`. `j`/`k` (and `gg`/`G`) move between stages;
+`<CR>` continues the stage from where it is: explainer, then drill, then
+challenge. Returning to the menu puts the cursor back on the stage just played.
 
 ```
  VIM DOJO                                     8 / 42 ★   habit mode: off
@@ -269,7 +274,7 @@ line numbers. The target is highlighted (not visible in this sketch).
 ```
  2.1 w b · Challenge          round 3/8          par 2       4.2 s left
  Move to the highlighted character
- Learned: h j k l · x · i a · A I · w b
+ Learned: h j k l  x  i a  A I  w b
  Last: ✓ 3 keys · par 2 · ★★ · intended 2w
  ───────────────────────────────────────────────────────────────────
    2  lorem ipsum dolor sit amet consectetur adipiscing
@@ -313,20 +318,28 @@ Vim's motion rules, which is where hand-written par goes wrong (`cw` acting like
   first test that counted commands found `2k9b` where `3kw` is a key shorter.)
 - State is the text, cursor and wanted column (`curswant`), so `$` then `j` is
   modelled correctly.
-- Candidates are only learned moves, counts 2–9, and `f`/`t` targets taken from
-  characters on the current line (not space).
+- Candidates are only learned moves and `f`/`t` targets taken from characters
+  on the current line (not space). Counts are 2–9 for `j k w b e`, where
+  relative numbers and word starts make them easy to see, but only 2–4 for
+  `h l x`: nobody counts letters at a glance, and `7x` should not beat `dt,`
+  ([decision 0007](docs/decisions/0007-count-limits.md)).
 - Commands that end in Insert mode (`i a A I c…`) are tried as finishers: the
   solver inserts a sentinel to learn where typing would start and works out the
   text to type from the goal. Generators therefore only describe goal text.
 - Edits are only tried on the lines being changed and near the changed columns;
   after an edit the text must still be "goal prefix + rest + goal suffix",
   otherwise the branch is dropped.
+- Pruning keeps it fast: a lower bound on the keys still needed (a change
+  needs at least a command, the new text and `<Esc>`) drops hopeless branches;
+  once `c` is learned, delete-then-insert is not explored; operators with
+  `f`/`t` only target characters at the edges of the changed text.
 - Ties are broken by: uses the round's focus move, then fewer commands, then key
   order.
 - Alternatives: the same search with the intended solution's main move banned,
   and with counts banned.
-- Measured on 0.12.5 with the full World 1–2 move set: 20–200 ms per round.
-  Rounds are generated one ahead, during the pause between rounds.
+- Measured on 0.12.5: the slowest of 200 rounds per stage takes under 200 ms
+  (most take under 10 ms). Rounds are generated one ahead, during the pause
+  between rounds.
 
 **What happens in a round.**
 
@@ -348,7 +361,7 @@ Vim's motion rules, which is where hand-written par goes wrong (`cw` acting like
 | `lua/dojo/init.lua` | `setup(opts)` and `open()` |
 | `lua/dojo/config.lua` | All tunable defaults (§10) |
 | `lua/dojo/curriculum.lua` | Worlds, stages, their order, learned moves |
-| `lua/dojo/stages/*.lua` | One file per stage: explainer and round generator |
+| `lua/dojo/stages/s<world>_<n>.lua` | One file per stage: explainer and round generator (`twostep.lua` for two-step rounds, `util.lua` helpers) |
 | `lua/dojo/solver.lua` | Par, intended solution, alternatives |
 | `lua/dojo/moves.lua` | Move families and the candidate keys they allow |
 | `lua/dojo/round.lua` | One round: buffer, key capture, habit mode, timer, completion check |
@@ -380,13 +393,18 @@ the suite).
 **Tests** run headless with `nvim -l tests/run.lua`, a small runner of our own.
 
 - Every stage, 200 seeds (drill and challenge context): the intended solution
-  and every alternative, replayed with real keys, reach the goal; the intended
-  solution is par keys long; drill solutions use the stage's move.
+  replays to the goal and is par keys long; drill solutions use the stage's
+  move; two-step rounds need at least two moves. For 10 rounds per stage,
+  every alternative replays too. Replays use `normal!`; real typed keys are
+  covered by the round runner tests.
 - Solver cases with known answers (`3w`, `$`, `3kw`, `dt,`, `cebar<Esc>`).
 - Round runner: keys fed with `nvim_feedkeys`, asserting key count, success,
   timeout and habit-mode blocking.
 - Star rules, unlock rule, saving then loading progress.
-- Solver time per round stays within budget.
+- Solver time per round: the budget is 200 ms; the test fails above 800 ms to
+  allow for slow CI machines, and prints the slowest round.
+- The game leaves the user's session alone: registers, last `f`/`t` search
+  and clipboard setting survive the solver; no stray buffers or keymaps.
 
 **CI** (GitHub Actions): the test suite on the pinned Neovim, and a Docker build
 that runs the suite inside the image.
@@ -413,6 +431,7 @@ through `require("dojo").setup()`, because playtesting will move most of them.
 | Habit mode | off; blocks 3rd press within 1000 ms |
 | Habit hint | run of 3+ identical presses |
 | Solver cost limit | 10 keys for move rounds, 16 for edit rounds |
+| Counts the solver tries | 2–9 for `j k w b e`, 2–4 for `h l x` |
 | Seeds per stage in tests | 200 |
 
 ## 11. Acceptance criteria
@@ -469,3 +488,5 @@ from your weakest moves.
 | --- | --- | --- |
 | 0.1 | 2026-10-07 | First prototype spec (10 stages, two worlds), reviewed as a doc |
 | 0.2 | 2026-10-07 | Moved into the repo; curriculum reordered after vimtutor (14 stages); habit mode and hints; solver details; CI |
+| 0.3 | 2026-10-07 | From building and the first playtest: count limits for `h l x`, solver pruning, `:q` and menu focus behavior, stage file names |
+| 0.4 | 2026-10-07 | From an independent code review: full per-round feedback, mouse ignored, leaving the tab stops a round, two-step rounds need two moves, test wording matches what is tested |

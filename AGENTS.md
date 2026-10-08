@@ -69,11 +69,13 @@ docs/playtests.md       playtest notes
 
 1. Add the stage to the curriculum table in `SPEC.md` §7 (keys, round kind,
    what rounds look like).
-2. Create `lua/dojo/stages/<id>.lua` following the contract in SPEC.md §9. If it
+2. Create `lua/dojo/stages/s<world>_<n>.lua` (stage 2.4 is `s2_4.lua`)
+   following the contract in SPEC.md §9. If it
    teaches a new kind of key, add the move family in `lua/dojo/moves.lua`.
 3. List it in `lua/dojo/curriculum.lua`.
 4. `make test`: the stage test generates 200 rounds per mode and replays every
-   solution. Fix the generator until it passes, then play it once yourself.
+   solution. Fix the generator until it passes, then play it once yourself
+   (`make dev`). `DOJO_SEEDS=40 make test` gives a faster first pass.
 
 ## Definition of done
 

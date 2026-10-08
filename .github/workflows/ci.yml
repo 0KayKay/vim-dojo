@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Tests on pinned Neovim
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install Neovim (keep in sync with docker/Dockerfile)
+        env:
+          NVIM_VERSION: v0.12.5
+          NVIM_SHA256: bce0f56eda1f1b1db6eee8f4133d7a38813ea07933837dd1777411ca384c6875
+        run: |
+          curl -fsSL -o nvim.tar.gz "https://github.com/neovim/neovim/releases/download/${NVIM_VERSION}/nvim-linux-x86_64.tar.gz"
+          echo "${NVIM_SHA256}  nvim.tar.gz" | sha256sum -c -
+          mkdir -p .nvim
+          tar -xzf nvim.tar.gz -C .nvim --strip-components=1
+          echo "$PWD/.nvim/bin" >> "$GITHUB_PATH"
+      - run: nvim --version | head -1
+      - run: make test
+
+  docker:
+    name: Docker image
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Build the image
+        run: docker compose build dojo
+      - name: Run the test suite inside the image
+        run: docker compose run --rm -T test
+      - name: Smoke test, the game opens its menu
+        run: |
+          docker compose run --rm -T dojo --headless -c Dojo \
+            -c "lua if not vim.api.nvim_buf_get_name(0):match('dojo://menu$') then vim.cmd('cquit 1') end" \
+            -c "qa!"
