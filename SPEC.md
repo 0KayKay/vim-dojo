@@ -172,9 +172,11 @@ during a round goes back to the menu.
 **Habit mode** (after delaytrain.nvim). On by default; toggled with `H` in the
 menu and saved (docs/decisions/0011). It acts only in challenges and bosses of
 stages where counts are already learned (1.2 and later); drills stay forgiving.
-Pressing the same one of `h j k l w b e` a third time within 1 s is blocked: the
-key does nothing, is not counted, and the header suggests the counted form. The
-character after `f`, `t`, `r` and similar is never blocked.
+Pressing the same one of `h j k l w b e` three times in a row within 1 s blocks
+the third press: the key does nothing, is not counted, and the header suggests
+the counted form. Any other key in between starts over, so a par like `jhj`
+followed quickly by the next step's `j` is never blocked. The character after
+`f`, `t`, `r` and similar is never blocked.
 
 ## 6. Scoring
 
@@ -541,7 +543,7 @@ through `require("dojo").setup()`, because playtesting will move most of them.
 | 3-star challenge | pass and score ≥ 2.75 |
 | Hint in a challenge or boss | round earns at most 1 star |
 | Pause after a success / fail | 0.4 s / 1.5 s |
-| Habit mode | on in challenges and bosses once counts are learned; blocks the 3rd press within 1000 ms |
+| Habit mode | on in challenges and bosses once counts are learned; blocks the 3rd press in a row within 1000 ms |
 | Habit hint | run of 3+ identical presses |
 | Word and character distances | up to 4 |
 | Solver cost limit | 10 keys for move rounds, 16 for edit rounds, 12 per chain step |
