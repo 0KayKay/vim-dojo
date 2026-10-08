@@ -226,7 +226,9 @@ texts are written for this game.
 
 Distances stay *glanceable*: vertical targets use the relative line numbers (2
 to 8 lines), word targets are at most 4 words away and character counts at most
-4, so the count can be seen rather than counted.
+4, so the count can be seen rather than counted. A round whose par repeats the
+same capped move three times in a row (`4l4l4l`) is regenerated: it trains
+patience, not a move.
 
 **World 1 · First steps** (vimtutor lesson 1)
 
@@ -299,6 +301,7 @@ all 17 entries fit in 22 rows.
 ```
 
 **Explainer.** One screen per stage; brackets mark the cursor in examples.
+Every screen's key help sits in the window's status line.
 
 ```
  2.1  w b  ·  Jump by words
@@ -317,7 +320,7 @@ all 17 entries fit in 22 rows.
 
  Tip: count the word starts, not the letters.
 
- <CR> start the drill      q menu
+ <CR> start the drill   q menu                               (status line)
 ```
 
 **Boss explainer.** Lists the world's moves, what the rounds look like and a
@@ -327,8 +330,9 @@ with a count and `j`/`k`, a few cells with `h`/`l`, word starts and ends with
 
 **Round.** The header sits in its own window above the play buffer; it cannot
 be focused or edited. Its first line names the part: `Drill · basics`,
-`Drill · combined`, `Challenge` or `Boss`, and `step 2/3` in chains. The play buffer holds only the task text, with relative
-line numbers. The target is highlighted (not visible in this sketch).
+`Drill · combined`, `Challenge`, or for bosses `mixed` or `chain`; in chains the
+prompt starts with `Step 2/3:`. The play buffer holds only the task text, with
+relative line numbers. The target is highlighted (not visible in this sketch).
 
 ```
  2.1 w b · Challenge          round 3/8          par 2       4.2 s left
@@ -365,7 +369,7 @@ A stage summary looks like this:
   4  ww              4    2j2w           –                 time out
   …
 
- n next stage   r retry   m menu
+ n next stage   r retry   m menu                             (status line)
 ```
 
 ## 9. Technical design
@@ -410,9 +414,10 @@ Vim's motion rules, which is where hand-written par goes wrong (`cw` acting like
   world", and what the boss concept report is built on.
 - Alternatives: the same search with the intended solution's main move banned,
   and with counts banned.
-- Measured on 0.12.5: the slowest of 200 rounds per stage takes under 200 ms
-  (most take under 10 ms). Rounds are generated one ahead, during the pause
-  between rounds.
+- Measured on 0.12.5: most rounds take under 20 ms; the slowest are combined
+  rounds in World 3, where every `d`/`c` motion is a candidate, and World 4
+  chains, both up to about 350 ms. Rounds are generated one ahead, during the
+  pause between rounds.
 
 **What happens in a round.**
 
@@ -424,8 +429,8 @@ Vim's motion rules, which is where hand-written par goes wrong (`cw` acting like
 2. The solver returns par, the intended solution, its concept tags and
    alternatives. The session retries generation if a requirement fails: no
    solution within the cost limit, the new move missing, "combined" not met,
-   or no move from the boss's world. Chains are solved step by step along the
-   intended path.
+   no move from the boss's world, or a clunky par (§7). Chains are solved step
+   by step along the intended path, each step within its own cost limit.
 3. The round runner shows the buffer and header, records typed keys with
    `vim.on_key`, runs the timer, and checks the state after each key.
 4. The scorer turns keys, time and hint use into round stars and habit hints;
@@ -494,8 +499,9 @@ the suite).
 - Round runner: keys fed with `nvim_feedkeys`, asserting key count, success,
   timeout and habit-mode blocking.
 - Star rules, unlock rule, saving then loading progress.
-- Solver time per round: the budget is 200 ms; the test fails above 800 ms to
-  allow for slow CI machines, and prints the slowest round.
+- Generation time per round: the budget is 400 ms; the test fails above
+  800 ms (per step in chains) to allow for slow CI machines, and prints the
+  slowest round.
 - The game leaves the user's session alone: registers, last `f`/`t` search
   and clipboard setting survive the solver; no stray buffers or keymaps.
 
@@ -523,7 +529,7 @@ through `require("dojo").setup()`, because playtesting will move most of them.
 | Habit mode | on in challenges and bosses once counts are learned; blocks the 3rd press within 1000 ms |
 | Habit hint | run of 3+ identical presses |
 | Word and character distances | up to 4 |
-| Solver cost limit | 10 keys for move rounds, 16 for edit rounds and chain steps |
+| Solver cost limit | 10 keys for move rounds, 16 for edit rounds, 12 per chain step |
 | Counts the solver tries | 2–9 for `j k w b e`, 2–4 for `h l x` |
 | Seeds per stage in tests | 200 per round kind |
 
