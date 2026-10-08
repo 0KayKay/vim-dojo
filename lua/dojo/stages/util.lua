@@ -35,18 +35,49 @@ function U.clamp(v, lo, hi)
   return math.max(lo, math.min(hi, v))
 end
 
--- In challenges, sometimes start the cursor somewhere else on the row, so the
--- round needs a move first (that's where moves combine).
-function U.maybe_wander(rng, ctx, col, line, chance)
-  if ctx.mode == "challenge" and rng:chance(chance or 0.35) then
-    return rng:int(0, #line - 1)
-  end
-  return col
-end
-
 -- is c punctuation (not a letter, digit or space)?
 function U.is_punct(c)
   return c:match("[^%w%s]") ~= nil
+end
+
+-- An edit "up to a punctuation mark" on a code-like line, for operators with
+-- f/t (SPEC §7 World 4). kinds: any of "dt", "df", "ct".
+function U.operator_to_punct(rng, kinds)
+  local words = require("dojo.words")
+  local L = words.code_line(rng)
+  local sp = U.spans(L)
+  for _ = 1, 60 do
+    local p = rng:int(0, #L - 1)
+    local ch = L:sub(p + 1, p + 1)
+    local starts = {}
+    for _, s in ipairs(sp) do
+      if s.s <= p - 4 and s.s >= p - 18 then
+        starts[#starts + 1] = s.s
+      end
+    end
+    if U.is_punct(ch) and #starts > 0 then
+      local col = rng:pick(starts)
+      if not L:sub(col + 2, p):find(ch, 1, true) then
+        local kind = rng:pick(kinds)
+        if kind == "dt" then
+          return { kind = "edit", lines = { L }, cursor = { 1, col }, goal_lines = { L:sub(1, col) .. L:sub(p + 1) }, prompt = "Delete the highlighted text" }
+        elseif kind == "df" then
+          return { kind = "edit", lines = { L }, cursor = { 1, col }, goal_lines = { L:sub(1, col) .. L:sub(p + 2) }, prompt = "Delete the highlighted text" }
+        else
+          local new = words.pick(rng, 1, { max_len = 5 })[1]
+          if new:sub(1, 1) ~= L:sub(col + 1, col + 1) then
+            return {
+              kind = "edit",
+              lines = { L },
+              cursor = { 1, col },
+              goal_lines = { L:sub(1, col) .. new .. L:sub(p + 1) },
+              prompt = "Change the highlighted text to match the goal line",
+            }
+          end
+        end
+      end
+    end
+  end
 end
 
 return U

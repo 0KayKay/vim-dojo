@@ -13,14 +13,14 @@ M.labels = {
   line = "0 ^ $",
   count = "counts",
   d = "d",
-  dd = "dd",
   c = "c",
+  lines = "dd cc",
   f = "f F",
   t = "t T",
 }
 
 -- order used when listing learned moves
-M.order = { "hjkl", "x", "ia", "AI", "wb", "e", "line", "count", "d", "dd", "c", "f", "t" }
+M.order = { "hjkl", "count", "x", "ia", "AI", "wb", "e", "line", "d", "c", "lines", "f", "t" }
 
 local function tok(keys, fams, extra)
   local set = {}
@@ -112,6 +112,16 @@ local function with(fams_set, extra)
   return list
 end
 
+-- An operator with j or k works on whole lines, so it also counts as the
+-- "lines" family (dj deletes two lines).
+local function operator_fams(op, m)
+  local extra = { op }
+  if m.keys:match("[jk]$") then
+    extra[#extra + 1] = "lines"
+  end
+  return with(m.fams, extra)
+end
+
 -- Edits that change text directly (x, d{motion}, dd).
 function M.edits(learned, motions)
   local out = {}
@@ -125,14 +135,14 @@ function M.edits(learned, motions)
   end
   if learned.d then
     for _, m in ipairs(motions) do
-      out[#out + 1] = tok("d" .. m.keys, with(m.fams, { "d" }), { rowlevel = m.rowlevel })
+      out[#out + 1] = tok("d" .. m.keys, operator_fams("d", m), { rowlevel = m.rowlevel })
     end
   end
-  if learned.dd then
-    out[#out + 1] = tok("dd", { "dd" }, { rowlevel = true })
+  if learned.lines then
+    out[#out + 1] = tok("dd", { "lines" }, { rowlevel = true })
     if learned.count then
       for _, n in ipairs(counted) do
-        out[#out + 1] = tok(n .. "dd", { "dd", "count" }, { rowlevel = true })
+        out[#out + 1] = tok(n .. "dd", { "lines", "count" }, { rowlevel = true })
       end
     end
   end
@@ -153,8 +163,11 @@ function M.finishers(learned, motions)
   end
   if learned.c then
     for _, m in ipairs(motions) do
-      out[#out + 1] = tok("c" .. m.keys, with(m.fams, { "c" }), { rowlevel = m.rowlevel })
+      out[#out + 1] = tok("c" .. m.keys, operator_fams("c", m), { rowlevel = m.rowlevel })
     end
+  end
+  if learned.lines then
+    out[#out + 1] = tok("cc", { "lines" }, { rowlevel = true })
   end
   return out
 end
@@ -179,6 +192,44 @@ function M.matches(t, focus)
     end
   end
   return false
+end
+
+-- Move families used by a solution (or several), as a set. Concept tags
+-- (SPEC §9): the basis for "uses the new move", "combined" and the boss report.
+function M.concepts(...)
+  local set = {}
+  for _, sol in ipairs({ ... }) do
+    for _, t in ipairs(sol.tokens or {}) do
+      for f in pairs(t.fams) do
+        set[f] = true
+      end
+    end
+  end
+  return set
+end
+
+-- Families in a concept set other than `except` (a set) and counts, which
+-- modify a move rather than add one.
+function M.other_moves(concepts, except)
+  local out = {}
+  for f in pairs(concepts) do
+    if f ~= "count" and not (except and except[f]) then
+      out[#out + 1] = f
+    end
+  end
+  table.sort(out)
+  return out
+end
+
+-- the families named in a focus (a list of family sets), as a set
+function M.focus_set(focus)
+  local set = {}
+  for _, group in ipairs(focus or {}) do
+    for _, f in ipairs(group) do
+      set[f] = true
+    end
+  end
+  return set
 end
 
 function M.learned_label(learned)

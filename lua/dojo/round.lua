@@ -67,15 +67,42 @@ local function decorate(buf, task)
   end
 end
 
+-- A chain step, as a task on the buffer as it is now (SPEC §5 Chains).
+local function step_task(buf, step)
+  local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+  if step.kind == "move" then
+    return { kind = "move", lines = lines, goal = { step.row, step.goal_col } }
+  end
+  local goal = vim.deepcopy(lines)
+  goal[step.row] = step.goal_line
+  return { kind = "edit", lines = lines, goal_lines = goal }
+end
+
+local function has_edit(task)
+  if task.kind == "chain" then
+    for _, st in ipairs(task.steps) do
+      if st.kind == "edit" then
+        return true
+      end
+    end
+    return false
+  end
+  return task.kind == "edit"
+end
+
 function M.load(buf, win, task)
   vim.bo[buf].modifiable = true
   local ul = vim.bo[buf].undolevels
   vim.bo[buf].undolevels = -1 -- a change with undolevels -1 clears undo history
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, task.lines)
   vim.bo[buf].undolevels = ul
-  vim.bo[buf].modifiable = task.kind == "edit"
+  vim.bo[buf].modifiable = has_edit(task)
   vim.bo[buf].modified = false
-  decorate(buf, task)
+  if task.kind == "chain" then
+    decorate(buf, step_task(buf, task.steps[1]))
+  else
+    decorate(buf, task)
+  end
   vim.api.nvim_win_set_cursor(win, task.cursor)
   vim.api.nvim_win_call(win, function()
     vim.fn.winrestview({ topline = 1, leftcol = 0 })
@@ -91,6 +118,14 @@ end
 
 local function at_goal(a)
   local task = a.o.task
+  if task.kind == "chain" then
+    local st = task.steps[a.step]
+    if st.kind == "move" then
+      local c = vim.api.nvim_win_get_cursor(a.o.win)
+      return c[1] == st.row and c[2] == st.goal_col
+    end
+    return (vim.api.nvim_buf_get_lines(a.o.buf, st.row - 1, st.row, false)[1] or "") == st.goal_line
+  end
   if task.kind == "move" then
     local c = vim.api.nvim_win_get_cursor(a.o.win)
     return c[1] == task.goal[1] and c[2] == task.goal[2]
@@ -129,6 +164,7 @@ local function finish(solved)
     keys = a.keys,
     time_ms = M.clock() - a.start,
     hint = a.hint,
+    steps_done = a.o.task.kind == "chain" and (solved and #a.o.task.steps or a.step - 1) or nil,
     blocked = a.blocked,
   }
   vim.schedule(function()
@@ -149,6 +185,16 @@ local function check()
     return
   end
   if at_goal(a) then
+    local task = a.o.task
+    if task.kind == "chain" and a.step < #task.steps then
+      -- next step: highlight it, keep counting keys
+      a.step = a.step + 1
+      decorate(a.o.buf, step_task(a.o.buf, task.steps[a.step]))
+      if a.o.on_step then
+        a.o.on_step(a.step)
+      end
+      return
+    end
     finish(true)
   end
 end
@@ -239,7 +285,7 @@ end
 function M.start(o)
   M.abort()
   M.load(o.buf, o.win, o.task)
-  local a = { o = o, keys = {}, count = 0, hint = false, blocked = 0, runs = {}, start = M.clock() }
+  local a = { o = o, keys = {}, count = 0, hint = false, blocked = 0, runs = {}, start = M.clock(), step = 1 }
   active = a
   vim.on_key(on_key, key_ns)
   vim.api.nvim_create_autocmd({ "CursorMoved", "TextChanged", "ModeChanged" }, {

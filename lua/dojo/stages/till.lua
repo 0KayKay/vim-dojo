@@ -2,7 +2,7 @@ local words = require("dojo.words")
 local U = require("dojo.stages.util")
 
 return {
-  id = "4.2",
+  key = "till",
   title = "t T",
   name = "Till a character",
   kind = "move",
@@ -19,7 +19,12 @@ return {
       keys = "t(",
       after = { "cal[l](alpha, beta);" },
     },
-    tip = "t is made for operators: dt, will delete up to a comma and keep the comma.",
+    combos = {
+      { "dt,", "delete up to the comma, keep it" },
+      { "ct)", "change everything up to the parenthesis" },
+      { "kt;", "up a line, then till" },
+    },
+    tip = "t is made for operators: read dt, as 'delete till comma'. Which move when: lines with a count and j k, a few cells with h l, words with w b e, line edges with 0 ^ $, one specific character with f or t.",
   },
   generate = function(rng, _)
     local lines = { words.code_line(rng), words.code_line(rng), words.code_line(rng) }
@@ -48,6 +53,19 @@ return {
           }
         end
       end
+    end
+  end,
+  -- with an operator (dt, ct)) most of the time; otherwise the generic combine step
+  combined = function(rng, ctx)
+    local kinds = {}
+    if ctx.learned.d then
+      kinds[#kinds + 1] = "dt"
+    end
+    if ctx.learned.c then
+      kinds[#kinds + 1] = "ct"
+    end
+    if #kinds > 0 and rng:chance(0.6) then
+      return U.operator_to_punct(rng, kinds)
     end
   end,
 }

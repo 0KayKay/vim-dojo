@@ -2,7 +2,7 @@ local words = require("dojo.words")
 local U = require("dojo.stages.util")
 
 return {
-  id = "1.4",
+  key = "append",
   title = "A I",
   name = "Add at line ends",
   kind = "edit",
@@ -19,7 +19,11 @@ return {
       keys = "A␣fox<Esc>",
       after = { "the quick brown fo[x]" },
     },
-    tip = "A and I work from anywhere on the line: no need to move first.",
+    combos = {
+      { "2jA…", "on another line: go there, then append" },
+      { "kI…", "up a line, then insert at its start" },
+    },
+    tip = "A and I work from anywhere on the line: only the line matters, not the column.",
   },
   generate = function(rng, _)
     local ws = words.pick(rng, rng:int(5, 7))

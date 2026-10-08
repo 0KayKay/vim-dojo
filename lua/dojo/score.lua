@@ -82,6 +82,44 @@ function M.habit_hints(keys, run_len)
   return out
 end
 
+-- Per move family: rounds that used it and their average stars, from the
+-- intended solutions' concept tags (SPEC §6 Concept report). Families seen in
+-- fewer than `min` rounds are left out. Returns the list, best first, and the
+-- weakest family (nil when everything was perfect).
+function M.concept_report(rounds, min)
+  min = min or 2
+  local stats = {}
+  for _, r in ipairs(rounds) do
+    for f in pairs(r.concepts or {}) do
+      local st = stats[f] or { fam = f, n = 0, stars = 0, solved = 0 }
+      st.n = st.n + 1
+      st.stars = st.stars + (r.stars or 0)
+      if r.solved then
+        st.solved = st.solved + 1
+      end
+      stats[f] = st
+    end
+  end
+  local list = {}
+  for _, st in pairs(stats) do
+    if st.n >= min then
+      st.avg = st.stars / st.n
+      list[#list + 1] = st
+    end
+  end
+  table.sort(list, function(a, b)
+    if a.avg ~= b.avg then
+      return a.avg > b.avg
+    end
+    return a.fam < b.fam
+  end)
+  local weakest = list[#list]
+  if weakest and weakest.avg >= 3 then
+    weakest = nil
+  end
+  return list, weakest
+end
+
 -- stars as text, e.g. 2 -> "★★☆"
 function M.stars_text(n, max)
   max = max or 3

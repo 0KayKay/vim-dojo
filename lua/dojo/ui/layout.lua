@@ -36,7 +36,8 @@ function M.buf(name)
   return b
 end
 
-local function window_options(win, play)
+-- status: the key help for this screen, shown in the window's status line
+local function window_options(win, play, status)
   wset(win, "number", play)
   wset(win, "relativenumber", play)
   wset(win, "cursorline", not play)
@@ -48,7 +49,9 @@ local function window_options(win, play)
   wset(win, "spell", false)
   wset(win, "colorcolumn", "")
   wset(win, "statuscolumn", "")
-  wset(win, "statusline", " Vim Dojo")
+  -- '%' starts a statusline item; key help is plain text
+  local text = (status or " Vim Dojo"):gsub("%%", "%%%%")
+  wset(win, "statusline", text)
 end
 
 function M.open()
@@ -134,12 +137,14 @@ function M.focus()
   return win
 end
 
--- show a named buffer in the main window
+-- show a named buffer in the main window; opts.play for the play buffer,
+-- opts.status for the key help in the status line
 function M.show(name, opts)
+  opts = opts or {}
   local win = M.open()
   local b = M.buf(name)
   vim.api.nvim_win_set_buf(win, b)
-  window_options(win, opts and opts.play or false)
+  window_options(win, opts.play or false, opts.status)
   local w = state.wipe
   if w and vim.api.nvim_buf_is_valid(w) and #vim.fn.win_findbuf(w) == 0 and not vim.bo[w].modified then
     pcall(vim.api.nvim_buf_delete, w, { force = true })

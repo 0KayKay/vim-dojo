@@ -1,7 +1,8 @@
 local words = require("dojo.words")
+local U = require("dojo.stages.util")
 
 return {
-  id = "4.1",
+  key = "find",
   title = "f F",
   name = "Find a character",
   kind = "move",
@@ -18,7 +19,11 @@ return {
       keys = "f,",
       after = { "call(alpha[,] beta);" },
     },
-    tip = "Look at the target, then type f and that character. Punctuation makes great targets.",
+    combos = {
+      { "df,", "delete up to and including the comma" },
+      { "jf(", "down a line, then find" },
+    },
+    tip = "Look at the target, then type f and that character. Punctuation makes great targets. f is not always shortest: a word start is often just w away.",
   },
   generate = function(rng, _)
     local lines = { words.code_line(rng), words.code_line(rng), words.code_line(rng) }
@@ -41,6 +46,12 @@ return {
           }
         end
       end
+    end
+  end,
+  -- with an operator (df,) most of the time; otherwise the generic combine step
+  combined = function(rng, ctx)
+    if ctx.learned.d and rng:chance(0.6) then
+      return U.operator_to_punct(rng, { "df" })
     end
   end,
 }

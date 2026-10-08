@@ -1,7 +1,7 @@
 local words = require("dojo.words")
 
 return {
-  id = "1.1",
+  key = "hjkl",
   title = "h j k l",
   name = "Move by cells",
   kind = "move",
@@ -20,7 +20,7 @@ return {
       keys = "jl",
       after = { "sun sky sea", "red m[a]p cup" },
     },
-    tip = "Rest your fingers on the home row: j points down, k points up.",
+    tip = "Rest your fingers on the home row: j points down, k points up. Next stage: counts, so you never press the same key three times.",
   },
   generate = function(rng, ctx)
     local lines = words.lines(rng, 5, 6, 8)

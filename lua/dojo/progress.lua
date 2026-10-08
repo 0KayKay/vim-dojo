@@ -15,7 +15,36 @@ local function path(name)
 end
 
 local function fresh()
-  return { version = 1, stages = vim.empty_dict(), settings = { habit = config.get().habit.enabled } }
+  return { version = 2, stages = vim.empty_dict(), settings = { habit = config.get().habit.enabled } }
+end
+
+-- version 1 saved stages by display number (docs/decisions/0010)
+M.V1_KEYS = {
+  ["1.1"] = "hjkl",
+  ["1.2"] = "x",
+  ["1.3"] = "insert",
+  ["1.4"] = "append",
+  ["2.1"] = "word",
+  ["2.2"] = "word_end",
+  ["2.3"] = "line_edges",
+  ["2.4"] = "counts",
+  ["3.1"] = "delete",
+  ["3.2"] = "lines",
+  ["3.3"] = "change",
+  ["4.1"] = "find",
+  ["4.2"] = "till",
+}
+
+local function migrate_v1(decoded)
+  local stages = vim.empty_dict()
+  for id, st in pairs(decoded.stages or {}) do
+    local key = M.V1_KEYS[id]
+    if key and type(st) == "table" then
+      stages[key] = st
+    end
+  end
+  -- habit mode is on by default from version 2 on (decision 0011)
+  return stages, { habit = true }
 end
 
 function M.load()
@@ -29,8 +58,14 @@ function M.load()
     f:close()
     local ok, decoded = pcall(vim.json.decode, raw)
     if ok and type(decoded) == "table" then
-      data.stages = decoded.stages or vim.empty_dict()
-      data.settings = vim.tbl_extend("force", data.settings, decoded.settings or {})
+      if (decoded.version or 1) < 2 then
+        data.stages, data.settings = migrate_v1(decoded)
+        data.migrated = true
+        M.save()
+      else
+        data.stages = decoded.stages or vim.empty_dict()
+        data.settings = vim.tbl_extend("force", data.settings, decoded.settings or {})
+      end
     end
   end
   return data
@@ -41,7 +76,7 @@ function M.save()
   vim.fn.mkdir(dir(), "p")
   local tmp = path("progress.json.tmp")
   local f = assert(io.open(tmp, "w"))
-  f:write(vim.json.encode(d))
+  f:write(vim.json.encode({ version = 2, stages = d.stages, settings = d.settings }))
   f:close()
   vim.uv.fs_rename(tmp, path("progress.json")) -- replaces the old file, on Windows too
 end
@@ -68,9 +103,20 @@ function M.stage(id)
   return s
 end
 
-function M.unlocked(id)
-  local prev = curriculum.prev(id)
-  return prev == nil or M.stage(prev).best_stars >= 1
+local function passed(key)
+  return M.stage(key).best_stars >= 1
+end
+
+-- SPEC §9 Unlock rules: the first stage; after a passed entry; a stage that
+-- has a star itself (e.g. migrated); every stage of a world whose boss is
+-- beaten (skip ahead). A boss opens with its world's first stage.
+function M.unlocked(key)
+  local st = curriculum.get(key)
+  if st.is_boss then
+    return M.unlocked(curriculum.world_first(st.world))
+  end
+  local prev = curriculum.prev(key)
+  return prev == nil or passed(key) or passed(prev) or passed(curriculum.world_boss(st.world))
 end
 
 function M.mark_explainer(id)

@@ -14,9 +14,21 @@ local function draw(s, r, elapsed)
   local width = layout.hud_width()
   local cfg = config.get()
 
-  local title = string.format(" %s %s · %s", s.stage.id, s.stage.title, s.mode == "drill" and "Drill" or "Challenge")
+  local part = ({ drill = "Drill", challenge = "Challenge", boss = "World " .. s.stage.world })[s.mode]
+  if r and s.mode == "drill" then
+    part = r.variant == "combined" and "Drill · combined" or "Drill · basics"
+  elseif r and s.mode == "boss" then
+    part = r.variant == "chain" and "chain" or "mixed"
+  end
+  local title = string.format(" %s %s · %s", s.stage.id, s.stage.title, part)
   local right, time_text, time_hl = "", "", "DojoDim"
+  local prompt = r and r.task.prompt or ""
   if r then
+    local steps = r.task.steps
+    if steps then
+      local st = steps[r.step or 1]
+      prompt = string.format("Step %d/%d: %s", r.step or 1, #steps, st.prompt)
+    end
     right = string.format("round %d/%d   par %d   ", r.index, #s.plan, r.sol.cost)
     if r.limit_ms then
       local left = math.max(0, (r.limit_ms - (elapsed or 0)) / 1000)
@@ -31,7 +43,7 @@ local function draw(s, r, elapsed)
 
   local rows = {
     { { title, "DojoTitle" }, { pad }, { right }, { time_text, time_hl } },
-    { { " " .. (r and r.task.prompt or "") } },
+    { { " " .. prompt } },
     { { " Learned: " .. moves.learned_label(s.learned), "DojoDim" } },
     s.last or { { "" } },
   }
@@ -52,8 +64,12 @@ function M.countdown(s, n)
 end
 
 function M.hint(s, r)
-  local msg = s.mode == "challenge" and "   (this round can now earn 1 star at most)" or ""
-  s.last = { { " Hint: ", "DojoDim" }, { r.sol.display, "DojoKey" }, { msg, "DojoDim" } }
+  local msg = s.mode ~= "drill" and "   (this round can now earn 1 star at most)" or ""
+  local display = r.sol.display
+  if r.task.steps then
+    display = r.task.steps[r.step or 1].sol.display -- this step only
+  end
+  s.last = { { " Hint: ", "DojoDim" }, { display, "DojoKey" }, { msg, "DojoDim" } }
   draw(s, r, r.elapsed)
 end
 

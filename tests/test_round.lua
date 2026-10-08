@@ -222,4 +222,31 @@ return {
       H.eq(config.get().habit.grace, 2)
     end,
   },
+  {
+    "a chain counts steps in order, edits included",
+    function()
+      local steps = {}
+      local task = {
+        kind = "chain",
+        lines = { "alpha beta gamma", "one twxo three" },
+        cursor = { 1, 0 },
+        steps = {
+          { kind = "move", row = 2, goal_col = 6, line = "one twxo three" },
+          { kind = "move", row = 1, goal_col = 6, line = "alpha beta gamma" },
+          { kind = "edit", row = 2, line = "one twxo three", goal_line = "one two three" },
+        },
+      }
+      -- w lands on step 2's target first; it only counts once step 1 is done
+      local r, buf = run(task, { "w", "j", "k", "j", "x" }, {
+        on_step = function(i)
+          steps[#steps + 1] = i
+        end,
+      })
+      H.ok(r and r.solved, "chain should be solved")
+      H.eq(r.count, 5)
+      H.eq(r.steps_done, 3)
+      H.eq(steps, { 2, 3 })
+      H.eq(vim.api.nvim_buf_get_lines(buf, 0, -1, false), { "alpha beta gamma", "one two three" })
+    end,
+  },
 }

@@ -2,7 +2,7 @@ local words = require("dojo.words")
 local U = require("dojo.stages.util")
 
 return {
-  id = "3.1",
+  key = "delete",
   title = "d{motion}",
   name = "Delete operator",
   kind = "edit",
@@ -22,7 +22,12 @@ return {
       keys = "dw",
       after = { "the [b]rown fox" },
     },
-    tip = "Operator + motion is Vim's grammar: every motion you know is now something you can delete.",
+    combos = {
+      { "dw de db d$ d^", "every motion you know is now something you can delete" },
+      { "wdw", "move first, then delete" },
+      { "2jd$", "on another line" },
+    },
+    tip = "Operator + motion is Vim's grammar: say what to do (d), then where to (w). It reads like a sentence: delete word.",
   },
   generate = function(rng, ctx)
     local ws = words.pick(rng, rng:int(6, 9))
@@ -64,13 +69,11 @@ return {
       local i = rng:int(1, #sp - k)
       s, e, col = sp[i].s, sp[i + k].s, sp[i].s
     end
-    local goal = line:sub(1, s) .. line:sub(e + 1)
-    col = U.maybe_wander(rng, ctx, col, line, 0.3)
     return {
       kind = "edit",
       lines = { line },
       cursor = { 1, col },
-      goal_lines = { goal },
+      goal_lines = { line:sub(1, s) .. line:sub(e + 1) },
       prompt = "Delete the highlighted text",
     }
   end,

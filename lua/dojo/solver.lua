@@ -498,6 +498,19 @@ function M.alternatives(task, learned, best, opts)
   return out
 end
 
+-- Replay tokens from a task's start; returns { lines, cursor } afterwards.
+-- Chains use it to start each step where the intended path leaves off.
+function M.run(task, tokens)
+  return with_scratch(function(buf, win)
+    vim.api.nvim_buf_set_lines(buf, 0, -1, false, task.lines)
+    restore({ row = task.cursor[1], col = task.cursor[2], cw = task.cursor[2] })
+    for _, t in ipairs(tokens) do
+      normal(t.keys)
+    end
+    return { lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false), cursor = vim.api.nvim_win_get_cursor(win) }
+  end)
+end
+
 -- Replay a solution token by token in the scratch buffer; true if it reaches
 -- the goal. Used by tests and as a safety check when generating rounds.
 function M.check(task, tokens)

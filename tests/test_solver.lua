@@ -103,7 +103,7 @@ return {
     "dd deletes a line",
     function()
       local t = edit({ "a b", "c d", "e f" }, { 2, 0 }, { "a b", "e f" })
-      local r = solver.solve(t, H.learned({ "hjkl", "dd" }))
+      local r = solver.solve(t, H.learned({ "hjkl", "lines" }))
       H.eq(r.keys, "dd")
     end,
   },

@@ -25,7 +25,7 @@ local function stray(rng, nmin, nmax)
 end
 
 return {
-  id = "1.2",
+  key = "x",
   title = "x",
   name = "Delete characters",
   kind = "edit",
@@ -36,6 +36,7 @@ return {
     heading = "Delete the character under the cursor",
     keys = {
       { "x", "delete one character" },
+      { "3x", "delete three (counts work here too)" },
       { "u", "undo the last change (costs a key, like any key)" },
     },
     example = {
@@ -43,11 +44,14 @@ return {
       keys = "x",
       after = { "the bro[w]n fox" },
     },
+    combos = {
+      { "3x", "with counts: three stray letters at once" },
+      { "j2lx", "go there first, then delete" },
+    },
     tip = "Stray letters are highlighted. Delete them all and the round ends.",
   },
-  generate = function(rng, ctx)
-    local line, goal, col = stray(rng, 1, 3)
-    col = U.maybe_wander(rng, ctx, col, line)
+  generate = function(rng, _)
+    local line, goal, col = stray(rng, 1, 4)
     return {
       kind = "edit",
       lines = { line },
