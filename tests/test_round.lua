@@ -178,6 +178,19 @@ return {
     end,
   },
   {
+    "habit mode counts presses in a row only",
+    function()
+      local lines = {}
+      for i = 1, 8 do
+        lines[i] = "line number " .. i
+      end
+      local task = { kind = "move", lines = lines, cursor = { 1, 0 }, goal = { 4, 1 } }
+      local r = run(task, { "j", "l", "j", "j" }, { habit = true })
+      H.ok(r and r.solved, "j l j j reaches line 4")
+      H.eq(r.blocked, 0)
+    end,
+  },
+  {
     "habit mode never blocks the character after f",
     function()
       local task = { kind = "move", lines = { "abc def efg hij" }, cursor = { 1, 0 }, goal = { 1, 8 } }

@@ -219,4 +219,25 @@ return {
       end
     end,
   },
+  {
+    "every stage and boss plays end to end at par (SPEC §11)",
+    function()
+      progress.wipe()
+      local cfg = config.get()
+      local saved = { cfg.countdown_s, cfg.pause_success_ms }
+      cfg.countdown_s, cfg.pause_success_ms = 0, 0
+      require("dojo").open()
+      local curriculum = require("dojo.curriculum")
+      for i, key in ipairs(curriculum.order) do
+        local modes = curriculum.get(key).is_boss and { "boss" } or { "drill", "challenge" }
+        for _, mode in ipairs(modes) do
+          session.start(key, mode, { seed = 1000 + i })
+          play_all()
+          H.ok(buffer_name():match("dojo://summary$"), key .. " " .. mode .. " did not reach its summary")
+        end
+        H.eq(progress.stage(key).best_stars, 3, key .. " at par earns 3 stars")
+      end
+      cfg.countdown_s, cfg.pause_success_ms = saved[1], saved[2]
+    end,
+  },
 }

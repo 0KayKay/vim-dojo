@@ -209,19 +209,20 @@ local function habit_blocks(a, typed, now)
   end
   if not habit_set[h.keys][typed] then
     a.prev_typed = typed
+    a.run = nil -- any other key starts over: only presses in a row count
     return false
   end
   -- a press right after a count digit starts fresh: 3j is the good habit
   if a.prev_typed and a.prev_typed:match("^[1-9]$") then
-    a.runs[typed] = nil
+    a.run = nil
   end
   a.prev_typed = typed
-  local run = a.runs[typed]
-  if run and now - run.t0 < h.window_ms then
+  local run = a.run
+  if run and run.key == typed and now - run.t0 < h.window_ms then
     run.n = run.n + 1
   else
-    run = { t0 = now, n = 1 }
-    a.runs[typed] = run
+    run = { key = typed, t0 = now, n = 1 }
+    a.run = run
   end
   return run.n > h.grace
 end
@@ -250,10 +251,14 @@ local function on_key(_, typed)
     -- the character after f/t/r/…: record it, but it is not a command
     a.arg_next = false
     a.prev_typed = nil
+    a.run = nil
     a.count = a.count + 1
     a.keys[#a.keys + 1] = { k = keys.typed(typed), mode = "arg" }
     vim.schedule(check)
     return
+  end
+  if mode ~= "n" then
+    a.run = nil -- typed text breaks a run of presses too
   end
   if mode == "n" and (typed == "\t" or typed == "\27") then
     return -- hint key, or <Esc> that changes nothing: free
@@ -283,7 +288,7 @@ end
 function M.start(o)
   M.abort()
   M.load(o.buf, o.win, o.task)
-  local a = { o = o, keys = {}, count = 0, hint = false, blocked = 0, runs = {}, start = M.clock(), step = 1 }
+  local a = { o = o, keys = {}, count = 0, hint = false, blocked = 0, start = M.clock(), step = 1 }
   active = a
   vim.on_key(on_key, key_ns)
   vim.api.nvim_create_autocmd({ "CursorMoved", "TextChanged", "ModeChanged" }, {
