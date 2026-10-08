@@ -46,3 +46,13 @@ solution: back nine words across two lines, as short as `2kwd$` and chosen only
 because `0` sorts before `2`. Among equally short solutions with as many
 commands, the solver now prefers the smaller sum of counts, which favors
 glanceable distances (`2k`, `w`) over long wrapped counts.
+
+## Addendum: operators stay on their line
+
+A World 4 chain's intended last step was `0kcbmark<Esc>`: from column 0, `cb`
+reaches back to the last word of the line above, and Vim's rule for exclusive
+motions that end in column 1 keeps the newline. It beat the readable
+`bc$mark<Esc>`-style answers by a key or two. A learner cannot be expected to
+find or understand that, so the solver now drops `d`/`c` with a charwise
+motion whenever the edit changes any line other than the cursor's. Motions
+alone may still cross lines (`b` back to the line above is fine).

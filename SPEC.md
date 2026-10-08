@@ -410,6 +410,9 @@ Vim's motion rules, which is where hand-written par goes wrong (`cw` acting like
   needs at least a command, the new text and `<Esc>`) drops hopeless branches;
   once `c` is learned, delete-then-insert is not explored; operators with
   `f`/`t` only target characters at the edges of the changed text.
+- Charwise operators (`d`/`c` with `h l w b e f t`) must leave every other
+  line alone: `0kcb`, which changes the end of the line above through Vim's
+  exclusive-motion rule, is legal but never the intended solution.
 - Ties are broken by: uses the round's focus move, then fewer commands, then
   smaller counts (`2kwd$` over `09bd$`, which wraps nine words across lines),
   then key order.
