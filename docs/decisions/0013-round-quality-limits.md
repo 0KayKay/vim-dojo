@@ -34,9 +34,9 @@ Building v0.5 surfaced two problems that the requirements in decisions 0008 and
   rarely waits.
 - Chain steps never ask for long rewrites; long typing stays in the stage
   challenges, where it is the point.
-- Combined rounds in World 3 still take up to about 330 ms, because every
-  `d`/`c` motion on a taller buffer is a candidate. The generation budget in
-  SPEC §9 is raised from 200 ms to 400 ms per round rather than making those
+- Combined rounds in Worlds 3 and 4 still take up to about 450 ms, because
+  every `d`/`c` motion on a taller buffer is a candidate. The generation budget
+  in SPEC §9 is raised from 200 ms to 500 ms per round rather than making those
   rounds simpler; the test still fails above 800 ms.
 
 ## Addendum: tie-break by smaller counts

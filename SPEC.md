@@ -427,9 +427,9 @@ Vim's motion rules, which is where hand-written par goes wrong (`cw` acting like
 - Alternatives: the same search with the intended solution's main move banned,
   and with counts banned.
 - Measured on 0.12.5: most rounds take under 20 ms; the slowest are combined
-  rounds in World 3, where every `d`/`c` motion is a candidate, and World 4
-  chains, both up to about 350 ms. Rounds are generated one ahead, during the
-  pause between rounds.
+  rounds in Worlds 3 and 4, where every `d`/`c` motion is a candidate on a
+  taller buffer (up to about 450 ms), and World 4 chains (up to about 200 ms
+  per step). Rounds are generated one ahead, during the pause between rounds.
 
 **What happens in a round.**
 
@@ -514,7 +514,7 @@ the suite).
 - Round runner: keys fed with `nvim_feedkeys`, asserting key count, success,
   timeout and habit-mode blocking.
 - Star rules, unlock rule, saving then loading progress.
-- Generation time per round: the budget is 400 ms; the test fails above
+- Generation time per round: the budget is 500 ms; the test fails above
   800 ms (per step in chains) to allow for slow CI machines, and prints the
   slowest round.
 - The game leaves the user's session alone: registers, last `f`/`t` search

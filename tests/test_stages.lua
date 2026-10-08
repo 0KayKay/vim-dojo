@@ -10,8 +10,8 @@ local moves = require("dojo.moves")
 local compose = require("dojo.compose")
 
 local SEEDS = tonumber(vim.env.DOJO_SEEDS) or 200
--- budget: 400 ms per round (SPEC §9); the tests allow twice that, per step
--- in chains, for slow CI machines
+-- budget: 500 ms per round (SPEC §9); the tests allow 800 ms, per step in
+-- chains, for slow CI machines
 local BUDGET_MS = 800
 
 local function ctx(key, mode)
