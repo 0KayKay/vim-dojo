@@ -182,8 +182,8 @@ solution, and up to two alternatives within par + 2 keys. Among equally short
 solutions, the one using the round's own stage move is preferred. Every drill
 and challenge round's intended solution must use the stage's move; rounds where
 it doesn't are thrown away and regenerated (docs/decisions/0008). Once counts
-are learned, alternatives that habit mode would block (`kkk`) are not shown. Beating par with a move not yet taught is allowed and
-shown as "under par".
+are learned, alternatives that habit mode would block (`kkk`) are not shown.
+Beating par with a move not yet taught is allowed and shown as "under par".
 
 **Round stars.**
 
@@ -230,8 +230,8 @@ texts are written for this game.
 
 Distances stay *glanceable*: vertical targets use the relative line numbers (2
 to 8 lines), word targets are at most 4 words away and character counts at most
-4, so the count can be seen rather than counted. A round whose par repeats the
-same capped move three times in a row (`4l4l4l`) is regenerated: it trains
+4, so the count can be seen rather than counted. A round whose par uses the
+same capped move three times (`4l4l4l`, `4l4ll4l`) is regenerated: it trains
 patience, not a move.
 
 **World 1 · First steps** (vimtutor lesson 1)
@@ -410,8 +410,9 @@ Vim's motion rules, which is where hand-written par goes wrong (`cw` acting like
   needs at least a command, the new text and `<Esc>`) drops hopeless branches;
   once `c` is learned, delete-then-insert is not explored; operators with
   `f`/`t` only target characters at the edges of the changed text.
-- Ties are broken by: uses the round's focus move, then fewer commands, then key
-  order.
+- Ties are broken by: uses the round's focus move, then fewer commands, then
+  smaller counts (`2kwd$` over `09bd$`, which wraps nine words across lines),
+  then key order.
 - **Concept tags.** Every candidate key carries the move families it uses
   (`d2w` uses `d`, `w b` and counts), so a solution's families are known. That
   is what checks "uses the new move", "combined" and "uses a move from this

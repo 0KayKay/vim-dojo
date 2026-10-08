@@ -17,8 +17,9 @@ Building v0.5 surfaced two problems that the requirements in decisions 0008 and
 
 ## Decision
 
-- A round, or a chain step, whose par repeats the same move token three times
-  in a row (`4l4l4l`) is thrown away and generated again.
+- A round, or a chain step, whose par uses the same move token three times
+  (`4l4l4l`, or `4l4ll4l` with a step in between) is thrown away and generated
+  again.
 - Each chain step is solved with a cost limit of 12 keys
   (`solver.max_cost_chain_step`), below the 16 for edit rounds. Longer steps are
   generated again.
@@ -37,3 +38,11 @@ Building v0.5 surfaced two problems that the requirements in decisions 0008 and
   `d`/`c` motion on a taller buffer is a candidate. The generation budget in
   SPEC §9 is raised from 200 ms to 400 ms per round rather than making those
   rounds simpler; the test still fails above 800 ms.
+
+## Addendum: tie-break by smaller counts
+
+The first playthrough of a combined 3.1 round showed `09bd$` as the intended
+solution: back nine words across two lines, as short as `2kwd$` and chosen only
+because `0` sorts before `2`. Among equally short solutions with as many
+commands, the solver now prefers the smaller sum of counts, which favors
+glanceable distances (`2k`, `w`) over long wrapped counts.
