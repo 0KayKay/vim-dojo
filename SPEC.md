@@ -74,8 +74,9 @@ next stage. Each world ends with a boss; beating it opens the next world.
    1 star unlocks the next stage.
 4. **Boss** (end of each world). 10 timed rounds: 6 mixed rounds that combine
    at least two different moves, then 4 *chains* of 2–3 steps (go here, then
-   change that, then go there). Every round needs at least one move from this
-   world. Beating it (1 star) unlocks the next world. The summary shows how you
+   change that, then go there). Mixed rounds take turns among the world's
+   stages, so each stage's move comes up. Every round needs at least one move
+   from this world. Beating it (1 star) unlocks the next world. The summary shows how you
    did per move and names your weakest one.
 
 ```mermaid
@@ -157,6 +158,8 @@ gets 13.8 s. The countdown in the header turns to a warning color in the last
 | `<Tab>` | Hint: shows the intended solution. In a challenge, that round can then earn at most 1 star. |
 | `:q` | Back to the menu (it closes the play window; the header window becomes the menu). An unfinished drill or challenge is discarded. |
 
+The play window's status line names both keys.
+
 Everything else is plain Neovim, with relative line numbers on. Mouse clicks
 and scrolling are ignored during rounds (keyboard only, and a click would beat
 par). Leaving the game's tab stops the running drill or challenge, and `:Dojo`
@@ -176,9 +179,10 @@ reward getting close to it without punishing a clumsy solve.
 
 **Par and solutions.** A solver (§9) computes par for every round, the intended
 solution, and up to two alternatives within par + 2 keys. Among equally short
-solutions, the one using the round's own stage move is preferred. In drills the
-intended solution must use the new move; rounds where it doesn't are thrown
-away and regenerated. Beating par with a move not yet taught is allowed and
+solutions, the one using the round's own stage move is preferred. Every drill
+and challenge round's intended solution must use the stage's move; rounds where
+it doesn't are thrown away and regenerated (docs/decisions/0008). Once counts
+are learned, alternatives that habit mode would block (`kkk`) are not shown. Beating par with a move not yet taught is allowed and
 shown as "under par".
 
 **Round stars.**
