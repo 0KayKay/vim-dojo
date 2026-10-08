@@ -35,12 +35,27 @@ M.V1_KEYS = {
   ["4.2"] = "till",
 }
 
+-- version 1's order, to tell which stages were open
+local V1_ORDER = { "1.1", "1.2", "1.3", "1.4", "2.1", "2.2", "2.3", "2.4", "3.1", "3.2", "3.3", "4.1", "4.2", "4.3" }
+
 local function migrate_v1(decoded)
+  local old = decoded.stages or {}
   local stages = vim.empty_dict()
-  for id, st in pairs(decoded.stages or {}) do
+  for id, st in pairs(old) do
     local key = M.V1_KEYS[id]
     if key and type(st) == "table" then
       stages[key] = st
+    end
+  end
+  -- v1 opened a stage once the one before it had a star; keep those open
+  -- even where a boss now sits in between (decision 0010)
+  for i, id in ipairs(V1_ORDER) do
+    local key = M.V1_KEYS[id]
+    local prev = old[V1_ORDER[i - 1]]
+    if key and (i == 1 or (type(prev) == "table" and (prev.best_stars or 0) >= 1)) then
+      stages[key] = stages[key]
+        or { explainer_seen = false, drill_done = false, best_stars = 0, best_score = 0, attempts = 0 }
+      stages[key].opened = true
     end
   end
   -- habit mode is on by default from version 2 on (decision 0011)
@@ -108,15 +123,19 @@ local function passed(key)
 end
 
 -- SPEC §9 Unlock rules: the first stage; after a passed entry; a stage that
--- has a star itself (e.g. migrated); every stage of a world whose boss is
--- beaten (skip ahead). A boss opens with its world's first stage.
+-- has a star itself or was open in a version 1 save; every stage of a world
+-- whose boss is beaten (skip ahead). A boss opens with its world's first stage.
 function M.unlocked(key)
   local st = curriculum.get(key)
   if st.is_boss then
     return M.unlocked(curriculum.world_first(st.world))
   end
   local prev = curriculum.prev(key)
-  return prev == nil or passed(key) or passed(prev) or passed(curriculum.world_boss(st.world))
+  return prev == nil
+    or passed(key)
+    or passed(prev)
+    or M.stage(key).opened == true -- open in a version 1 save
+    or passed(curriculum.world_boss(st.world))
 end
 
 function M.mark_explainer(id)

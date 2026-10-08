@@ -59,6 +59,8 @@ function U.operator_to_punct(rng, kinds)
       local col = rng:pick(starts)
       if not L:sub(col + 2, p):find(ch, 1, true) then
         local kind = rng:pick(kinds)
+        -- f takes the mark itself, t stops before it
+        local keep = (kind == "df" or kind == "cf") and p + 2 or p + 1
         if kind == "dt" then
           return { kind = "edit", lines = { L }, cursor = { 1, col }, goal_lines = { L:sub(1, col) .. L:sub(p + 1) }, prompt = "Delete the highlighted text" }
         elseif kind == "df" then
@@ -70,7 +72,7 @@ function U.operator_to_punct(rng, kinds)
               kind = "edit",
               lines = { L },
               cursor = { 1, col },
-              goal_lines = { L:sub(1, col) .. new .. L:sub(p + 1) },
+              goal_lines = { L:sub(1, col) .. new .. L:sub(keep) },
               prompt = "Change the highlighted text to match the goal line",
             }
           end

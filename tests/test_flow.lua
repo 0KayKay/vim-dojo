@@ -76,6 +76,10 @@ return {
       local saved = config.get().countdown_s
       config.get().countdown_s = 0
       require("dojo").open()
+      session.start("hjkl", "challenge", { seed = 98 })
+      H.ok(not session.current().habit, "no habit mode before counts are learned")
+      session.start("counts", "drill", { seed = 98 })
+      H.ok(not session.current().habit, "no habit mode in drills")
       session.start("counts", "challenge", { seed = 99 })
       H.ok(session.current().habit, "habit mode is on in challenges once counts are known")
       play_all()
@@ -137,11 +141,13 @@ return {
         return #vim.fn.getbufinfo({ buflisted = 1 })
       end
       local before = listed()
+      local maps = #vim.api.nvim_get_keymap("n") + #vim.api.nvim_get_keymap("i")
       for _ = 1, 3 do
         require("dojo").open()
         require("dojo.ui.layout").close()
       end
       H.eq(listed(), before)
+      H.eq(#vim.api.nvim_get_keymap("n") + #vim.api.nvim_get_keymap("i"), maps, "no global keymaps")
     end,
   },
   {

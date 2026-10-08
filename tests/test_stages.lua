@@ -119,7 +119,7 @@ for w = 1, #curriculum.worlds do
           local state = { lines = task.lines, cursor = task.cursor }
           local par = 0
           for i, step in ipairs(task.steps) do
-            local sub = compose.step_task(step, state.lines, state.cursor)
+            local sub = compose.step_task(step, state.lines, state.cursor, state.curswant)
             H.ok(solver.check(sub, step.sol.tokens), string.format("step %d does not replay: %s", i, what))
             par = par + step.sol.cost
             state = solver.run(sub, step.sol.tokens)
@@ -184,6 +184,28 @@ cases[#cases + 1] = {
 }
 
 cases[#cases + 1] = {
+  "boss mixed rounds as planned: each turn uses its stage's move",
+  function()
+    for w = 1, #curriculum.worlds do
+      local key = curriculum.world_boss(w)
+      local c = ctx(key, "boss")
+      local rng = Rng.new(900 + w)
+      for _ = 1, 3 do
+        for _, spec in ipairs(session.plan(key, "boss", rng)) do
+          if spec.variant == "mixed" then
+            local r = session.make_round(spec, c, rng)
+            local what = string.format("%s seed %d %s", spec.key, r.task.seed, r.sol.keys)
+            H.ok(r.sol.focus, "the turn's move is missing: " .. what)
+            H.ok(uses_world(r.concepts, w), "no move from this world: " .. what)
+            H.ok(#moves.other_moves(r.concepts) >= 2, "fewer than two moves: " .. what)
+          end
+        end
+      end
+    end
+  end,
+}
+
+cases[#cases + 1] = {
   "alternatives replay and stay within par + 2",
   function()
     local rng = Rng.new(77)
@@ -218,6 +240,7 @@ cases[#cases + 1] = {
     H.ok(session.clunky(sol("2k", "4l", "4l", "l", "4l")))
     H.ok(not session.clunky(sol("4l", "4l", "x")))
     H.ok(not session.clunky(sol("3j", "4l", "4l")))
+    H.ok(not session.clunky(sol("l", "l", "l")), "before counts, lll is the answer")
   end,
 }
 

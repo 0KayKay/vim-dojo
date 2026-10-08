@@ -123,6 +123,8 @@ return {
       H.ok(progress.stage("lines").explainer_seen, "3.2 was dd")
       H.eq(progress.setting("habit"), true, "habit mode is the new default")
       H.ok(progress.unlocked("insert"), "after a passed stage")
+      H.ok(progress.unlocked("delete"), "v1 3.1 was open after 2.4, though 2.B now comes first")
+      H.ok(not progress.unlocked("word"), "v1 2.1 was locked too")
       progress.reset() -- saved as version 2
       local raw = vim.json.decode(table.concat(vim.fn.readfile(dir .. "/progress.json"), "\n"))
       H.eq(raw.version, 2)

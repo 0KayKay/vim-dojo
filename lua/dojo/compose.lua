@@ -141,7 +141,7 @@ function M.layout(rng, steps)
     lines[#lines + 1] = steps[i].line
     rows[i] = #lines
   end
-  if rng:chance(0.5) then
+  if #lines == 1 or rng:chance(0.5) then -- the start must be on another line
     lines[#lines + 1] = filler(rng, code)
   end
   local r
@@ -151,14 +151,15 @@ function M.layout(rng, steps)
   return lines, rows, { r, rng:int(0, math.max(0, #lines[r] - 1)) }
 end
 
--- The sub-task for chain step i, given the buffer and cursor before it.
-function M.step_task(step, lines, cursor)
+-- The sub-task for chain step i, given the buffer, cursor and remembered
+-- column (curswant, nil = the cursor column) before it.
+function M.step_task(step, lines, cursor, curswant)
   if step.kind == "move" then
-    return { kind = "move", lines = lines, cursor = cursor, goal = { step.row, step.goal_col } }
+    return { kind = "move", lines = lines, cursor = cursor, curswant = curswant, goal = { step.row, step.goal_col } }
   end
   local goal = vim.deepcopy(lines)
   goal[step.row] = step.goal_line
-  return { kind = "edit", lines = lines, cursor = cursor, goal_lines = goal }
+  return { kind = "edit", lines = lines, cursor = cursor, curswant = curswant, goal_lines = goal }
 end
 
 return M

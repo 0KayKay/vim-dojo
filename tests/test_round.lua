@@ -249,4 +249,54 @@ return {
       H.eq(vim.api.nvim_buf_get_lines(buf, 0, -1, false), { "alpha beta gamma", "one two three" })
     end,
   },
+  {
+    "in a chain, the text can only change during edit steps",
+    function()
+      local buf, win = setup_window()
+      round.start({
+        buf = buf,
+        win = win,
+        task = {
+          kind = "chain",
+          lines = { "alpha beta", "one twxo" },
+          cursor = { 1, 0 },
+          steps = {
+            { kind = "move", row = 1, goal_col = 6, line = "alpha beta" },
+            { kind = "edit", row = 2, line = "one twxo", goal_line = "one two" },
+          },
+        },
+        on_done = function() end,
+      })
+      H.eq(vim.bo[buf].modifiable, false, "move step")
+      H.type("x")
+      H.eq(vim.api.nvim_buf_get_lines(buf, 0, 1, false)[1], "alpha beta")
+      H.type("w")
+      H.settle(30)
+      H.eq(vim.bo[buf].modifiable, true, "edit step")
+      round.abort()
+    end,
+  },
+  {
+    "a chain step starts with the column j and k remember, as in play",
+    function()
+      local solver = require("dojo.solver")
+      local compose = require("dojo.compose")
+      local learned = H.learned({ "hjkl", "line" })
+      local lines = { "short", "a much longer line here" }
+      local steps = {
+        { kind = "move", row = 1, goal_col = 4, line = lines[1] },
+        { kind = "move", row = 2, goal_col = 22, line = lines[2] },
+      }
+      local sub1 = compose.step_task(steps[1], lines, { 1, 0 })
+      local sol1 = solver.solve(sub1, learned)
+      H.eq(sol1.keys, "$")
+      local state = solver.run(sub1, sol1.tokens)
+      local sol2 = solver.solve(compose.step_task(steps[2], state.lines, state.cursor, state.curswant), learned)
+      H.eq(sol2.keys, "j", "after $, j keeps to the line end")
+      -- and the round runner agrees
+      local r = run({ kind = "chain", lines = lines, cursor = { 1, 0 }, steps = steps }, { "$", "j" })
+      H.ok(r and r.solved, "chain solved with $ then j")
+      H.eq(r.count, 2)
+    end,
+  },
 }

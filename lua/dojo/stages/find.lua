@@ -50,8 +50,15 @@ return {
   end,
   -- with an operator (df,) most of the time; otherwise the generic combine step
   combined = function(rng, ctx)
-    if ctx.learned.d and rng:chance(0.6) then
-      return U.operator_to_punct(rng, { "df" })
+    local kinds = {}
+    if ctx.learned.d then
+      kinds[#kinds + 1] = "df"
+    end
+    if ctx.learned.c then
+      kinds[#kinds + 1] = "cf"
+    end
+    if #kinds > 0 and rng:chance(0.6) then
+      return U.operator_to_punct(rng, kinds)
     end
   end,
 }

@@ -437,7 +437,7 @@ function M.solve(task, learned, opts)
       text = start,
       row = task.cursor[1],
       col = task.cursor[2],
-      cw = task.cursor[2],
+      cw = task.curswant or task.cursor[2], -- chains: the column j/k remember
       cost = 0,
       ntok = 0,
       nsum = 0,
@@ -536,16 +536,21 @@ function M.alternatives(task, learned, best, opts)
   return out
 end
 
--- Replay tokens from a task's start; returns { lines, cursor } afterwards.
--- Chains use it to start each step where the intended path leaves off.
+-- Replay tokens from a task's start; returns { lines, cursor, curswant }
+-- afterwards. Chains use it to start each step where the intended path leaves
+-- off, including the column j and k remember (after $, the line end).
 function M.run(task, tokens)
   return with_scratch(function(buf, win)
     vim.api.nvim_buf_set_lines(buf, 0, -1, false, task.lines)
-    restore({ row = task.cursor[1], col = task.cursor[2], cw = task.cursor[2] })
+    restore({ row = task.cursor[1], col = task.cursor[2], cw = task.curswant or task.cursor[2] })
     for _, t in ipairs(tokens) do
       normal(t.keys)
     end
-    return { lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false), cursor = vim.api.nvim_win_get_cursor(win) }
+    return {
+      lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false),
+      cursor = vim.api.nvim_win_get_cursor(win),
+      curswant = vim.fn.winsaveview().curswant,
+    }
   end)
 end
 
@@ -554,7 +559,7 @@ end
 function M.check(task, tokens)
   return with_scratch(function(buf, win)
     vim.api.nvim_buf_set_lines(buf, 0, -1, false, task.lines)
-    restore({ row = task.cursor[1], col = task.cursor[2], cw = task.cursor[2] })
+    restore({ row = task.cursor[1], col = task.cursor[2], cw = task.curswant or task.cursor[2] })
     for _, t in ipairs(tokens) do
       normal(t.keys)
     end

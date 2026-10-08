@@ -19,6 +19,10 @@ end
 
 local function locked_msg(key)
   local st = curriculum.get(key)
+  if st.is_boss then
+    local first = curriculum.get(curriculum.world_first(st.world))
+    return string.format("%s is locked: it opens together with %s.", st.id, first.id)
+  end
   local prev = curriculum.get(curriculum.prev(key))
   return string.format("%s is locked: earn a star in %s first, or beat the World %d boss.", st.id, prev.id, st.world)
 end
@@ -83,18 +87,19 @@ local function map(buf)
       M.continue(key)
     end
   end, o)
+  -- notices go out after the start: showing a screen clears the message line
   vim.keymap.set("n", "d", with_selected(function(key, st)
+    require("dojo.session").start(key, st.is_boss and "boss" or "drill")
     if st.is_boss then
       notify("Bosses have no drill; the boss starts now.")
     end
-    require("dojo.session").start(key, st.is_boss and "boss" or "drill")
   end), o)
   vim.keymap.set("n", "c", with_selected(function(key, st)
     if st.is_boss then
       require("dojo.session").start(key, "boss")
     elseif not progress.stage(key).drill_done then
-      notify("Do the drill first; it starts now.")
       require("dojo.session").start(key, "drill")
+      notify("Do the drill first; it starts now.")
     else
       require("dojo.session").start(key, "challenge")
     end

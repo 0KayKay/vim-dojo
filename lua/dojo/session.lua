@@ -71,14 +71,17 @@ local function uses_world(concepts, w)
   return false
 end
 
--- Solutions that use one capped move three times (4l4l4l, 4l4ll4l) teach
--- nothing but patience; such rounds are generated again.
+-- Solutions that use one capped count three times (4l4l4l, 4l4ll4l) teach
+-- nothing but patience; such rounds are generated again. Before counts are
+-- learned, lll is simply the answer.
 local function clunky(sol)
   local seen = {}
   for _, t in ipairs(sol.tokens) do
-    seen[t.keys] = (seen[t.keys] or 0) + 1
-    if seen[t.keys] >= 3 then
-      return true
+    if t.keys:match("^%d") then
+      seen[t.keys] = (seen[t.keys] or 0) + 1
+      if seen[t.keys] >= 3 then
+        return true
+      end
     end
   end
   return false
@@ -129,8 +132,8 @@ local function meets(spec, st, sol, ctx)
     return sol.focus
   elseif spec.variant == "combined" then
     return sol.focus and #moves.other_moves(concepts, moves.focus_set(st.focus)) >= 1
-  else -- mixed
-    return uses_world(concepts, ctx.world) and #moves.other_moves(concepts) >= 2
+  else -- mixed: the turn's stage move, a move from this world, two families
+    return sol.focus and uses_world(concepts, ctx.world) and #moves.other_moves(concepts) >= 2
   end
 end
 
@@ -173,7 +176,7 @@ local function make_chain(spec, ctx, rng)
       local sols, total, keys, displays, tokens = {}, 0, "", {}, {}
       for i, st in ipairs(steps) do
         st.row = rows[i]
-        local sub = compose.step_task(st, state.lines, state.cursor)
+        local sub = compose.step_task(st, state.lines, state.cursor, state.curswant)
         local sol = solver.solve(sub, ctx.learned, { focus = st.focus, max_cost = config.get().solver.max_cost_chain_step })
         if not sol or sol.cost == 0 or clunky(sol) or not solver.check(sub, sol.tokens) then
           ok = false

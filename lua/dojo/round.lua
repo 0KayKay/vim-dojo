@@ -78,14 +78,11 @@ local function step_task(buf, step)
   return { kind = "edit", lines = lines, goal_lines = goal }
 end
 
-local function has_edit(task)
+-- Move rounds are read-only; in chains, only while the step is a move, so a
+-- stray x can't shift the highlighted target away from the checked one.
+local function editable(task, step)
   if task.kind == "chain" then
-    for _, st in ipairs(task.steps) do
-      if st.kind == "edit" then
-        return true
-      end
-    end
-    return false
+    return task.steps[step or 1].kind == "edit"
   end
   return task.kind == "edit"
 end
@@ -96,7 +93,7 @@ function M.load(buf, win, task)
   vim.bo[buf].undolevels = -1 -- a change with undolevels -1 clears undo history
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, task.lines)
   vim.bo[buf].undolevels = ul
-  vim.bo[buf].modifiable = has_edit(task)
+  vim.bo[buf].modifiable = editable(task)
   vim.bo[buf].modified = false
   if task.kind == "chain" then
     decorate(buf, step_task(buf, task.steps[1]))
@@ -189,6 +186,7 @@ local function check()
     if task.kind == "chain" and a.step < #task.steps then
       -- next step: highlight it, keep counting keys
       a.step = a.step + 1
+      vim.bo[a.o.buf].modifiable = editable(task, a.step)
       decorate(a.o.buf, step_task(a.o.buf, task.steps[a.step]))
       if a.o.on_step then
         a.o.on_step(a.step)
