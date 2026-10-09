@@ -9,8 +9,23 @@ local config = require("dojo.config")
 
 local M = {}
 
-local last -- { s, sum }
+local last -- { s, sum, newbest }
 local mapped -- the buffer that has our keymaps (it can be wiped and recreated)
+local round_line, line_round = {}, {} -- round index <-> buffer row
+
+local function selected_round()
+  return line_round[vim.api.nvim_win_get_cursor(0)[1]]
+end
+
+-- j/k step between round rows (SPEC §8 Summary)
+local function step(dir)
+  local i = selected_round()
+  local n = #last.s.rounds
+  local target = i and math.max(1, math.min(n, i + dir)) or 1
+  if round_line[target] then
+    vim.api.nvim_win_set_cursor(0, { round_line[target], 0 })
+  end
+end
 
 local function map(buf)
   local o = { buffer = buf, nowait = true, silent = true }
@@ -29,7 +44,23 @@ local function map(buf)
   end
   vim.keymap.set("n", "r", retry, o)
   vim.keymap.set("n", "n", onward, o)
-  vim.keymap.set("n", "<CR>", onward, o)
+  -- look at a round as it started, and play it again (decision 0017)
+  vim.keymap.set("n", "<CR>", function()
+    local i = selected_round()
+    if i then
+      require("dojo.ui.review").show(last.s, i)
+    end
+  end, o)
+  for _, k in ipairs({ "j", "<Down>" }) do
+    vim.keymap.set("n", k, function()
+      step(1)
+    end, o)
+  end
+  for _, k in ipairs({ "k", "<Up>" }) do
+    vim.keymap.set("n", k, function()
+      step(-1)
+    end, o)
+  end
   for _, k in ipairs({ "m", "q" }) do
     vim.keymap.set("n", k, function()
       require("dojo.ui.menu").show(last.s.id)
@@ -47,15 +78,23 @@ end
 
 local mode_name = { drill = "Drill", challenge = "Challenge", boss = "Boss" }
 
-function M.show(s, sum, newbest)
-  last = { s = s, sum = sum }
+-- the summary shown last, again (back from a round review), cursor on round i
+function M.reshow(i)
+  if last then
+    M.show(last.s, last.sum, last.newbest, i)
+  end
+end
+
+function M.show(s, sum, newbest, focus_round)
+  last = { s = s, sum = sum, newbest = newbest }
   local keys
   if s.mode == "drill" then
-    keys = " <CR> start the challenge   r drill again   m menu"
+    keys = " <CR> look at round   n start the challenge   r drill again   m menu"
   elseif sum.pass and curriculum.next(s.id) then
-    keys = s.mode == "boss" and " n next world   r retry   m menu" or " n next stage   r retry   m menu"
+    keys = s.mode == "boss" and " <CR> look at round   n next world   r retry   m menu"
+      or " <CR> look at round   n next stage   r retry   m menu"
   else
-    keys = " r retry   m menu"
+    keys = " <CR> look at round   r retry   m menu"
   end
   local buf, win = layout.show("summary", { status = keys })
   if mapped ~= buf then
@@ -106,7 +145,10 @@ function M.show(s, sum, newbest)
       "DojoDim",
     },
   }
+  round_line, line_round = {}, {}
+  local timed_out = false
   for i, r in ipairs(s.rounds) do
+    timed_out = timed_out or not r.solved
     local alts = {}
     for _, a in ipairs(r.alts or {}) do
       alts[#alts + 1] = a.display
@@ -132,11 +174,19 @@ function M.show(s, sum, newbest)
       row[#row + 1] = { "  " .. r.hints[1], "DojoDim" }
     end
     rows[#rows + 1] = row
+    round_line[i], line_round[#rows] = #rows, i
+  end
+  -- after a timeout: undo saves a round from a slip (decision 0017); in a boss
+  -- summary this line takes the place of the gap before the concept report
+  if timed_out then
+    rows[#rows + 1] = { { " A slip? ", "DojoWarn" }, { "u", "DojoKey" }, { " undoes it for one key, and the round goes on.", "DojoDim" } }
   end
   if s.mode == "boss" then
     -- three columns, so every move family fits on an 80 × 24 screen
     local list, weakest = score.concept_report(s.rounds)
-    rows[#rows + 1] = ""
+    if not timed_out then
+      rows[#rows + 1] = ""
+    end
     rows[#rows + 1] = { { " By move: rounds that used it, average stars", "DojoDim" } }
     local row
     for i, st in ipairs(list) do
@@ -162,7 +212,7 @@ function M.show(s, sum, newbest)
     end
   end
   render.draw(buf, rows)
-  vim.api.nvim_win_set_cursor(win, { 1, 0 })
+  vim.api.nvim_win_set_cursor(win, { round_line[focus_round or 1] or 1, 0 })
 end
 
 return M

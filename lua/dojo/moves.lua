@@ -20,7 +20,7 @@ M.labels = {
 }
 
 -- order used when listing learned moves
-M.order = { "hjkl", "count", "x", "ia", "AI", "wb", "e", "line", "d", "c", "lines", "f", "t" }
+M.order = { "hjkl", "x", "ia", "AI", "count", "wb", "e", "line", "d", "c", "lines", "f", "t" }
 
 local function tok(keys, fams, extra)
   local set = {}
@@ -37,9 +37,10 @@ local function tok(keys, fams, extra)
 end
 M.tok = tok
 
--- Counts: 2-9 where the count is easy to see (relative line numbers, word
--- starts), 2-4 for single characters, which nobody counts at a glance
--- (docs/decisions/0007-count-limits.md).
+-- Counts: 2-9 for j and k, read off the relative line numbers; 2-4 for w b e
+-- and x, which have to be counted by eye; none for h and l: a few cells are
+-- pressed out, longer trips belong to word motions or f/t (decisions 0007 and
+-- 0014).
 local counted = { "2", "3", "4", "5", "6", "7", "8", "9" }
 local counted_chars = { "2", "3", "4" }
 
@@ -62,8 +63,8 @@ function M.motions(learned, line)
   local out = {}
   local function simple(k, fam, rowlevel)
     out[#out + 1] = tok(k, { fam }, { rowlevel = rowlevel })
-    if learned.count then
-      for _, n in ipairs((k == "h" or k == "l") and counted_chars or counted) do
+    if learned.count and k ~= "h" and k ~= "l" then
+      for _, n in ipairs((k == "j" or k == "k") and counted or counted_chars) do
         out[#out + 1] = tok(n .. k, { fam, "count" }, { rowlevel = rowlevel })
       end
     end

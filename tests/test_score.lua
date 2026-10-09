@@ -64,10 +64,10 @@ return {
     function()
       progress.wipe()
       H.ok(progress.unlocked("hjkl"))
-      H.ok(not progress.unlocked("counts"))
+      H.ok(not progress.unlocked("x"))
       progress.record_drill("hjkl")
       H.ok(progress.record_challenge("hjkl", { stars = 1, score = 1.5 }))
-      H.ok(progress.unlocked("counts"))
+      H.ok(progress.unlocked("x"))
       H.ok(not progress.record_challenge("hjkl", { stars = 1, score = 1.2 }), "worse is not a new best")
       H.ok(progress.record_challenge("hjkl", { stars = 2, score = 2.1 }))
       progress.setting("habit", false)
@@ -93,12 +93,12 @@ return {
       progress.wipe()
       H.ok(progress.unlocked("boss_1"), "the first boss is open from the start")
       H.ok(not progress.unlocked("boss_2"))
-      H.ok(not progress.unlocked("word"))
+      H.ok(not progress.unlocked("counts"))
       progress.record_challenge("boss_1", { stars = 1, score = 1.5 })
-      H.ok(progress.unlocked("word"), "the next world opens")
+      H.ok(progress.unlocked("counts"), "the next world opens")
       H.ok(progress.unlocked("boss_2"))
       H.ok(progress.unlocked("append"), "the rest of the beaten world opens too")
-      H.ok(not progress.unlocked("word_end"))
+      H.ok(not progress.unlocked("word"))
     end,
   },
   {
@@ -124,7 +124,8 @@ return {
       H.eq(progress.setting("habit"), true, "habit mode is the new default")
       H.ok(progress.unlocked("insert"), "after a passed stage")
       H.ok(progress.unlocked("delete"), "v1 3.1 was open after 2.4, though 2.B now comes first")
-      H.ok(not progress.unlocked("word"), "v1 2.1 was locked too")
+      H.ok(progress.unlocked("word"), "counts now sits right before w b, with a star")
+      H.ok(not progress.unlocked("word_end"), "v1 2.2 was locked too")
       progress.reset() -- saved as version 2
       local raw = vim.json.decode(table.concat(vim.fn.readfile(dir .. "/progress.json"), "\n"))
       H.eq(raw.version, 2)

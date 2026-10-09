@@ -1,11 +1,11 @@
--- Worlds, stages and bosses in teaching order (SPEC.md §7, decisions 0010 and
--- 0012). Stages are identified by stable keys; display ids like "2.1" or "2.B"
+-- Worlds, stages and bosses in teaching order (SPEC.md §7, decisions 0010,
+-- 0012 and 0014). Stages are identified by stable keys; display ids like "2.1" or "2.B"
 -- come from the order and are never saved.
 local M = {}
 
 M.worlds = {
-  { name = "First steps", stages = { "hjkl", "counts", "x", "insert", "append" }, boss = "boss_1" },
-  { name = "Words and lines", stages = { "word", "word_end", "line_edges" }, boss = "boss_2" },
+  { name = "First steps", stages = { "hjkl", "x", "insert", "append" }, boss = "boss_1" },
+  { name = "Words and lines", stages = { "counts", "word", "word_end", "line_edges" }, boss = "boss_2" },
   { name = "Operators", stages = { "delete", "change", "lines" }, boss = "boss_3" },
   { name = "Find in the line", stages = { "find", "till" }, boss = "boss_4" },
 }

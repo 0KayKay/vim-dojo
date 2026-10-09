@@ -21,10 +21,10 @@ return {
       after = { "the quick[ ]brown fox" },
     },
     combos = {
-      { "2li…", "move a little first, then insert" },
+      { "lli…", "move a little first, then insert" },
       { "ja…", "from the line above: go down, then append" },
     },
-    tip = "The goal line under the text shows what's missing. Type it, then <Esc>. i or a: pick the one that needs no extra move.",
+    tip = "The text to type is shown in place, in green. Type it, then <Esc>. i or a: pick the one that needs no extra move; a saves the l in li.",
   },
   generate = function(rng, _)
     local ws = words.pick(rng, rng:int(5, 7), { min_len = 3 })
@@ -71,7 +71,7 @@ return {
       lines = { line },
       cursor = { 1, col },
       goal_lines = { goal },
-      prompt = "Type the missing text shown in the goal line",
+      prompt = "Type the text shown in green",
     }
   end,
 }

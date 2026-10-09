@@ -36,7 +36,9 @@ assumes stock Neovim.
 - **Boss:** at the end of each world, mixed rounds and chains of 2–3 steps. It
   shows your weakest move. Beat a boss early to skip ahead.
 - **Habit mode** (on by default, `H` in the menu): in timed rounds, blocks a
-  motion key pressed three times in a row once you have learned counts.
+  motion key pressed four times in a row once you have learned counts.
+- **Look back:** in any summary, `<CR>` on a round shows how it started next to
+  your keys and the intended solution; `p` plays it again without a clock.
 
 ## Develop
 

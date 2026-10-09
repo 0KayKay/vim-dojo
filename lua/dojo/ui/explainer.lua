@@ -10,15 +10,33 @@ local M = {}
 local current
 local mapped -- the buffer that has our keymaps (it can be wiped and recreated)
 
-local function start()
-  progress.mark_explainer(current)
-  local st = curriculum.get(current)
-  require("dojo.session").start(current, st.is_boss and "boss" or "drill")
+-- what <CR> starts on this page: the boss, the drill until it has been done
+-- once, then the challenge (decision 0017)
+local function next_mode(key)
+  if curriculum.get(key).is_boss then
+    return "boss"
+  end
+  return progress.stage(key).drill_done and "challenge" or "drill"
+end
+
+local function start(mode)
+  return function()
+    progress.mark_explainer(current)
+    local m = mode or next_mode(current)
+    if curriculum.get(current).is_boss then
+      m = "boss"
+    elseif m == "challenge" and not progress.stage(current).drill_done then
+      m = "drill"
+    end
+    require("dojo.session").start(current, m)
+  end
 end
 
 local function map(buf)
   local o = { buffer = buf, nowait = true, silent = true }
-  vim.keymap.set("n", "<CR>", start, o)
+  vim.keymap.set("n", "<CR>", start(), o)
+  vim.keymap.set("n", "d", start("drill"), o)
+  vim.keymap.set("n", "c", start("challenge"), o)
   for _, k in ipairs({ "q", "m" }) do
     vim.keymap.set("n", k, function()
       progress.mark_explainer(current)
@@ -42,7 +60,11 @@ function M.show(key)
   current = key
   local st = curriculum.get(key)
   local ex = st.explainer
-  local status = st.is_boss and " <CR> start the boss   q menu" or " <CR> start the drill   q menu"
+  local status = ({
+    boss = " <CR> start the boss   q menu",
+    drill = " <CR> start the drill   q menu",
+    challenge = " <CR> start the challenge   d drill   q menu",
+  })[next_mode(key)]
   local buf, win = layout.show("explainer", { status = status })
   if mapped ~= buf then
     map(buf)

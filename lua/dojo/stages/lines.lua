@@ -43,7 +43,7 @@ return {
         lines = lines,
         cursor = { r, rng:int(1, #lines[r] - 1) },
         goal_lines = goal,
-        prompt = "Rewrite the highlighted line to match the goal",
+        prompt = "Rewrite the struck-through line as shown in green",
       }
     end
     local k = rng:int(1, 4)
@@ -61,7 +61,7 @@ return {
       lines = lines,
       cursor = { row, rng:int(0, #lines[row] - 1) },
       goal_lines = goal,
-      prompt = "Delete the highlighted lines",
+      prompt = "Delete the struck-through lines",
     }
   end,
 }

@@ -71,33 +71,49 @@ local function uses_world(concepts, w)
   return false
 end
 
--- Solutions that use one capped count three times (4l4l4l, 4l4ll4l) teach
--- nothing but patience; such rounds are generated again. Before counts are
--- learned, lll is simply the answer.
-local function clunky(sol)
-  local seen = {}
+-- Does a par break the natural-distance rules (SPEC §7, decision 0014)? More
+-- than 3 presses of h/l or of j/k, a count above 4 on w b e (d5w too), or the
+-- same counted move three times (4j4j4j). Returns the reason, or nil.
+local function unnatural(sol)
+  local hl, jk, seen = 0, 0, {}
   for _, t in ipairs(sol.tokens) do
-    if t.keys:match("^%d") then
-      seen[t.keys] = (seen[t.keys] or 0) + 1
-      if seen[t.keys] >= 3 then
-        return true
+    local k = t.keys
+    if k == "h" or k == "l" then
+      hl = hl + 1
+    elseif k == "j" or k == "k" then
+      jk = jk + 1
+    end
+    local n = k:match("^[dc]?([1-9])[wbe]")
+    if n and tonumber(n) > 4 then
+      return "a count above 4 on a word motion"
+    end
+    if k:match("^%d") then
+      seen[k] = (seen[k] or 0) + 1
+      if seen[k] >= 3 then
+        return "the same counted move three times"
       end
     end
   end
-  return false
+  if hl > 3 then
+    return "more than 3 presses of h/l"
+  end
+  if jk > 3 then
+    return "more than 3 presses of j/k"
+  end
+  return nil
 end
-M.clunky = clunky
+M.unnatural = unnatural
 
--- Would habit mode block this solution? Three presses of one habit key in a
--- row (kkk); typed text does not count.
+-- Would habit mode block this solution? More presses of one habit key in a
+-- row than habit mode allows (kkkk); typed text does not count.
 function M.habit_breaking(sol)
-  local habit = config.get().habit.keys
+  local h = config.get().habit
   local run, prev = 0, nil
   for _, t in ipairs(sol.tokens) do
-    if #t.keys == 1 and habit:find(t.keys, 1, true) then
+    if #t.keys == 1 and h.keys:find(t.keys, 1, true) then
       run = t.keys == prev and run + 1 or 1
       prev = t.keys
-      if run >= 3 then
+      if run > h.grace then
         return true
       end
     else
@@ -141,25 +157,33 @@ local function make_chain(spec, ctx, rng)
   local gctx = { learned = ctx.learned, mode = ctx.mode, variant = "basic" }
   local world_keys = curriculum.stages_through(ctx.key, ctx.world)
   local all_keys = curriculum.stages_through(ctx.key)
+  -- how far sideways the next step may start from where the last one ended:
+  -- a few cells before counts (World 1), a few words after (decision 0014)
+  local near = ctx.learned.count and 12 or 3
   for _ = 1, config.get().generate_tries do
     local seed = rng:seed()
     local r = Rng.new(seed)
-    local steps, ok = {}, true
+    local steps, ok, prev_end = {}, true, nil
+    local world_step = r:int(1, spec.steps) -- which step comes from this world
     for i = 1, spec.steps do
       local step
-      for _ = 1, 30 do
-        local key = (i == 1 and r:pick(world_keys)) or (not r:chance(0.25) and r:pick(all_keys)) or nil
+      for _ = 1, 40 do
+        local key = (i == world_step and r:pick(world_keys)) or (not r:chance(0.25) and r:pick(all_keys)) or nil
+        local cand
         if key then
           local st = curriculum.get(key)
           local task = (r:chance(0.5) and st.combined and st.combined(r, gctx)) or st.generate(r, gctx)
-          step = compose.line_step(task)
-          if step then
-            step.stage, step.focus = key, st.focus
+          cand = compose.line_step(task)
+          if cand then
+            cand.stage, cand.focus = key, st.focus
           end
         else
-          step = compose.spot_step(r, false)
+          cand = compose.spot_step(r, false, prev_end, near)
         end
-        if step then
+        -- A and I reach a line's ends from anywhere on it
+        local anywhere = cand and cand.edge and ctx.learned.AI
+        if cand and (not prev_end or anywhere or math.abs(cand.spot - prev_end) <= near) then
+          step = cand
           break
         end
       end
@@ -167,18 +191,25 @@ local function make_chain(spec, ctx, rng)
         ok = false
         break
       end
+      step.edge = step.edge and ctx.learned.AI or nil
       steps[i] = step
+      prev_end = step.end_col
     end
     if ok then
-      r:shuffle(steps) -- the step from this world is not always first
-      local lines, rows, cursor = compose.layout(r, steps)
+      local lines, rows, cursor = compose.layout(r, steps, {
+        shuffle = ctx.learned.count, -- before counts, steps stay next to each other
+        near = near,
+      })
       local state = { lines = lines, cursor = cursor }
       local sols, total, keys, displays, tokens = {}, 0, "", {}, {}
       for i, st in ipairs(steps) do
         st.row = rows[i]
         local sub = compose.step_task(st, state.lines, state.cursor, state.curswant)
         local sol = solver.solve(sub, ctx.learned, { focus = st.focus, max_cost = config.get().solver.max_cost_chain_step })
-        if not sol or sol.cost == 0 or clunky(sol) or not solver.check(sub, sol.tokens) then
+        if not sol or sol.cost == 0 or unnatural(sol) or not solver.check(sub, sol.tokens) then
+          if M.debug then
+            M.debug(sol and (unnatural(sol) or "check") or "no solution", sol and sol.display)
+          end
           ok = false
           break
         end
@@ -232,7 +263,7 @@ function M.make_round(spec, ctx, rng)
       task.seed = seed
       task.stage = st.key
       local sol = solver.solve(task, ctx.learned, { focus = st.focus })
-      if sol and sol.cost > 0 and not clunky(sol) and meets(spec, st, sol, ctx) and solver.check(task, sol.tokens) then
+      if sol and sol.cost > 0 and not unnatural(sol) and meets(spec, st, sol, ctx) and solver.check(task, sol.tokens) then
         return {
           task = task,
           sol = sol,
@@ -284,7 +315,9 @@ function M.next_round()
   r.step = 1
   s.rounds[s.i] = r
   if s.mode ~= "drill" then
-    r.limit_ms = (cfg.time_base_s + cfg.time_per_key_s * r.sol.cost) * 1000
+    -- chains get reading time for every step after the first (decision 0015)
+    local extra_steps = r.task.steps and (#r.task.steps - 1) or 0
+    r.limit_ms = (cfg.time_base_s + cfg.time_per_key_s * r.sol.cost + cfg.time_per_step_s * extra_steps) * 1000
   end
   local buf, win = play_window()
   hud().round(s, r)

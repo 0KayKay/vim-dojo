@@ -8,8 +8,9 @@ M.defaults = {
   challenge_combined_rounds = 5, -- the main lever for a future difficulty setting
   boss_mixed_rounds = 6,
   boss_chains = { 2, 2, 3, 3 }, -- steps per chain round, played last (decision 0009)
-  time_base_s = 4, -- time limit = base + per_key * par (challenges and bosses)
-  time_per_key_s = 0.7,
+  time_base_s = 5, -- time limit = base + per_key * par (challenges and bosses)
+  time_per_key_s = 0.8,
+  time_per_step_s = 3, -- chains: reading time for every step after the first (decision 0015)
   warn_s = 2, -- warning color in the last seconds
   star2_slack = 2, -- 2 stars when keys <= par + slack
   pass_ratio = 0.75,
@@ -21,7 +22,7 @@ M.defaults = {
   habit = {
     enabled = true, -- default for new players; the menu toggle is saved (decision 0011)
     keys = "hjklwbe",
-    grace = 2, -- presses allowed within the window
+    grace = 3, -- presses in a row allowed within the window; the next is blocked (decision 0014)
     window_ms = 1000,
   },
   habit_hint_run = 3, -- run length that triggers a hint

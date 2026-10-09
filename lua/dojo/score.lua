@@ -57,7 +57,8 @@ function M.summary(rounds)
   }
 end
 
-local hint_keys = { h = true, j = true, k = true, l = true, w = true, b = true, e = true, x = true }
+-- keys that take counts; h and l don't (decision 0014)
+local hint_keys = { j = true, k = true, w = true, b = true, e = true, x = true }
 
 -- keys: list of { k = display key, mode = mode when typed }
 -- returns hints like "jjjj → 4j", one per run of repeated presses

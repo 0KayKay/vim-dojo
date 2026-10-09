@@ -14,7 +14,7 @@ local function draw(s, r, elapsed)
   local width = layout.hud_width()
   local cfg = config.get()
 
-  local part = ({ drill = "Drill", challenge = "Challenge", boss = "World " .. s.stage.world })[s.mode]
+  local part = ({ drill = "Drill", challenge = "Challenge", boss = "World " .. s.stage.world, practice = "Practice" })[s.mode]
   if r and s.mode == "drill" then
     part = r.variant == "combined" and "Drill · combined" or "Drill · basics"
   elseif r and s.mode == "boss" then
@@ -52,6 +52,12 @@ end
 
 function M.round(s, r)
   draw(s, r, 0)
+end
+
+-- any rows, for screens that borrow the header (the round review)
+function M.custom(rows)
+  layout.open_hud()
+  render.draw(layout.buf("hud"), rows)
 end
 
 function M.tick(s, r, elapsed)

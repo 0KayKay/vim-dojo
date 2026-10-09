@@ -74,7 +74,7 @@ return {
       lines = { line },
       cursor = { 1, col },
       goal_lines = { line:sub(1, s) .. line:sub(e + 1) },
-      prompt = "Delete the highlighted text",
+      prompt = "Delete the struck-through text",
     }
   end,
 }

@@ -24,7 +24,8 @@ local function common(r, what)
   H.ok(not table.concat(task.lines, "\n"):find(solver.SENTINEL, 1, true), "sentinel in text: " .. what)
   H.ok(sol.cost > 0, "round already solved at start: " .. what)
   for _, part in ipairs(task.steps or { r }) do -- chains: per step
-    H.ok(not session.clunky(part.sol), "clunky par: " .. what .. " " .. part.sol.display)
+    local why = session.unnatural(part.sol)
+    H.ok(not why, string.format("unnatural par (%s): %s %s", tostring(why), what, part.sol.display))
   end
 end
 
@@ -59,6 +60,9 @@ for _, key in ipairs(curriculum.order) do
               local what = string.format("seed %d %s", r.task.seed, r.sol.keys)
               common(r, what)
               H.ok(solver.check(r.task, r.sol.tokens), "intended does not replay: " .. what)
+              if st.world == 1 then
+                H.ok(not r.concepts.count, "World 1 has no counts: " .. what)
+              end
               -- every round needs the stage's move (decision 0008)
               H.ok(r.sol.focus, "solution skips the stage move: " .. what)
               if variant == "combined" then
@@ -165,7 +169,10 @@ cases[#cases + 1] = {
         seen[spec.key] = (seen[spec.key] or 0) + 1
       end
     end
-    H.eq(seen, { word = 2, word_end = 2, line_edges = 2 })
+    -- four stages, six turns: each one once or twice
+    for _, k in ipairs({ "counts", "word", "word_end", "line_edges" }) do
+      H.ok(seen[k] == 1 or seen[k] == 2, k .. " " .. tostring(seen[k]))
+    end
     -- in World 1 only the editing stages can mix two moves
     seen = {}
     for _, spec in ipairs(session.plan("boss_1", "boss", rng)) do
@@ -227,7 +234,7 @@ cases[#cases + 1] = {
 }
 
 cases[#cases + 1] = {
-  "clunky solutions are spotted",
+  "unnatural pars are spotted (SPEC §7)",
   function()
     local function sol(...)
       local t = {}
@@ -236,11 +243,14 @@ cases[#cases + 1] = {
       end
       return { tokens = t }
     end
-    H.ok(session.clunky(sol("4l", "4l", "4l")))
-    H.ok(session.clunky(sol("2k", "4l", "4l", "l", "4l")))
-    H.ok(not session.clunky(sol("4l", "4l", "x")))
-    H.ok(not session.clunky(sol("3j", "4l", "4l")))
-    H.ok(not session.clunky(sol("l", "l", "l")), "before counts, lll is the answer")
+    H.ok(session.unnatural(sol("l", "l", "l", "l")), "four cells with l")
+    H.ok(session.unnatural(sol("l", "j", "h", "x", "h", "l")), "four h/l presses in all")
+    H.ok(not session.unnatural(sol("j", "l", "l", "l", "x")), "three cells and a line")
+    H.ok(session.unnatural(sol("k", "k", "k", "k")), "four lines with k")
+    H.ok(session.unnatural(sol("5w")), "five words")
+    H.ok(session.unnatural(sol("d6b")), "six words back, with d")
+    H.ok(not session.unnatural(sol("8j", "4w")), "lines by count, four words")
+    H.ok(session.unnatural(sol("4j", "4j", "x", "4j")), "the same counted move three times")
   end,
 }
 
@@ -254,8 +264,8 @@ cases[#cases + 1] = {
       end
       return { tokens = t }
     end
-    H.ok(session.habit_breaking(sol("k", "k", "k", "l", "a␣bear<Esc>")))
-    H.ok(not session.habit_breaking(sol("k", "k", "l", "a␣bear<Esc>")))
+    H.ok(session.habit_breaking(sol("k", "k", "k", "k", "l", "a␣bear<Esc>")))
+    H.ok(not session.habit_breaking(sol("k", "k", "k", "l", "a␣bear<Esc>")), "three presses are fine")
     H.ok(not session.habit_breaking(sol("3k", "3k", "3k")), "counted moves are the good habit")
     H.ok(not session.habit_breaking(sol("x", "x", "x")), "x is not a habit key")
   end,

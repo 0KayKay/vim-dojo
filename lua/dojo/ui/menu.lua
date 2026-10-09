@@ -11,7 +11,7 @@ local line_to_key, key_to_line = {}, {}
 local mapped -- the buffer that has our keymaps (it can be wiped and recreated)
 local last_key -- the entry last opened, to return the cursor to it
 
-local STATUS = " <CR> play  d drill  c challenge  ? explainer  H habit mode  q quit"
+local STATUS = " <CR> open  d drill  c challenge  H habit mode  q quit"
 
 local function notify(msg)
   vim.api.nvim_echo({ { msg, "DojoWarn" } }, false, {})
@@ -44,24 +44,15 @@ local function step(dir)
   end
 end
 
--- explainer first, then the drill, then challenges; bosses: explainer, boss
+-- open the stage page (its explainer), where <CR> starts the next step
+-- (decision 0017)
 function M.continue(key)
   last_key = key
   if not progress.unlocked(key) then
     notify(locked_msg(key))
     return
   end
-  local st = curriculum.get(key)
-  local p = progress.stage(key)
-  if not p.explainer_seen then
-    require("dojo.ui.explainer").show(key)
-  elseif st.is_boss then
-    require("dojo.session").start(key, "boss")
-  elseif not p.drill_done then
-    require("dojo.session").start(key, "drill")
-  else
-    require("dojo.session").start(key, "challenge")
-  end
+  require("dojo.ui.explainer").show(key)
 end
 
 local function with_selected(fn)

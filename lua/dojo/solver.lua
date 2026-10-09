@@ -5,6 +5,7 @@
 -- is modelled exactly (see docs/decisions/0003-solver-runs-real-neovim.md).
 local moves = require("dojo.moves")
 local text = require("dojo.text")
+local marks = require("dojo.marks")
 local keys = require("dojo.keys")
 local config = require("dojo.config")
 
@@ -81,8 +82,31 @@ local function with_scratch(fn)
   return res
 end
 
+-- the marks a player sees, drawn in the scratch buffer too: inline ghost
+-- text shifts the columns j and k aim for (dojo.marks)
+local mark_ns = vim.api.nvim_create_namespace("dojo.solver.marks")
+
+local function mark(buf, task, lines)
+  if task.kind == "edit" then
+    marks.edit(buf, mark_ns, lines, task.goal_lines)
+  else
+    vim.api.nvim_buf_clear_namespace(buf, mark_ns, 0, -1)
+  end
+end
+
 local function restore(st)
   vim.fn.winrestview({ lnum = st.row, col = st.col, curswant = st.cw, topline = 1, leftcol = 0 })
+end
+
+-- The column j and k aim for at the start: given (chains), or the cursor's
+-- screen column with the marks drawn, as Neovim sets it when the round loads.
+local function start_cw(buf, task)
+  if task.curswant then
+    return task.curswant
+  end
+  mark(buf, task, vim.api.nvim_buf_get_lines(buf, 0, -1, false))
+  vim.api.nvim_win_set_cursor(0, task.cursor)
+  return vim.fn.winsaveview().curswant
 end
 
 local function normal(k)
@@ -167,7 +191,7 @@ function M.solve(task, learned, opts)
   end
 
   return with_scratch(function(buf)
-    local cur_text
+    local cur_text, marked_text
     local cache = {}
     local function info(t)
       local c = cache[t]
@@ -181,6 +205,10 @@ function M.solve(task, learned, opts)
       if cur_text ~= t then
         vim.api.nvim_buf_set_lines(buf, 0, -1, false, info(t).lines)
         cur_text = t
+      end
+      if marked_text ~= t then
+        mark(buf, task, info(t).lines)
+        marked_text = t
       end
     end
     local function buffer_text()
@@ -433,11 +461,12 @@ function M.solve(task, learned, opts)
       end
     end
 
+    load(start)
     local s0 = {
       text = start,
       row = task.cursor[1],
       col = task.cursor[2],
-      cw = task.curswant or task.cursor[2], -- chains: the column j/k remember
+      cw = start_cw(buf, task), -- chains: the column j/k remember
       cost = 0,
       ntok = 0,
       nsum = 0,
@@ -542,8 +571,9 @@ end
 function M.run(task, tokens)
   return with_scratch(function(buf, win)
     vim.api.nvim_buf_set_lines(buf, 0, -1, false, task.lines)
-    restore({ row = task.cursor[1], col = task.cursor[2], cw = task.curswant or task.cursor[2] })
+    restore({ row = task.cursor[1], col = task.cursor[2], cw = start_cw(buf, task) })
     for _, t in ipairs(tokens) do
+      mark(buf, task, vim.api.nvim_buf_get_lines(buf, 0, -1, false))
       normal(t.keys)
     end
     return {
@@ -559,8 +589,9 @@ end
 function M.check(task, tokens)
   return with_scratch(function(buf, win)
     vim.api.nvim_buf_set_lines(buf, 0, -1, false, task.lines)
-    restore({ row = task.cursor[1], col = task.cursor[2], cw = task.curswant or task.cursor[2] })
+    restore({ row = task.cursor[1], col = task.cursor[2], cw = start_cw(buf, task) })
     for _, t in ipairs(tokens) do
+      mark(buf, task, vim.api.nvim_buf_get_lines(buf, 0, -1, false))
       normal(t.keys)
     end
     if task.kind == "edit" then

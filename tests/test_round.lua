@@ -157,7 +157,7 @@ return {
     end,
   },
   {
-    "habit mode blocks the third press, not counted",
+    "habit mode blocks the fourth press in a row, not counted",
     function()
       local lines = {}
       for i = 1, 8 do
@@ -165,16 +165,20 @@ return {
       end
       local task = { kind = "move", lines = lines, cursor = { 1, 0 }, goal = { 6, 0 } }
       local blocked = 0
-      local r = run(task, { "j", "j", "j", "3j" }, {
+      local r = run(task, { "j", "j", "j", "j", "2j" }, {
         habit = true,
         on_blocked = function()
           blocked = blocked + 1
         end,
       })
-      H.ok(r and r.solved, "2 j + 3j reach line 6")
-      H.eq(r.count, 4)
+      H.ok(r and r.solved, "3 j + 2j reach line 6")
+      H.eq(r.count, 5)
       H.eq(r.blocked, 1)
       H.eq(blocked, 1)
+      -- three cells with l is the natural move: never blocked
+      local r2 = run({ kind = "move", lines = { "abcdef" }, cursor = { 1, 0 }, goal = { 1, 3 } }, { "l", "l", "l" }, { habit = true })
+      H.ok(r2 and r2.solved)
+      H.eq(r2.blocked, 0)
     end,
   },
   {
@@ -232,7 +236,7 @@ return {
   {
     "config is untouched by rounds",
     function()
-      H.eq(config.get().habit.grace, 2)
+      H.eq(config.get().habit.grace, 3)
     end,
   },
   {

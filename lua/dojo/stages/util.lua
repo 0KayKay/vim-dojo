@@ -62,9 +62,9 @@ function U.operator_to_punct(rng, kinds)
         -- f takes the mark itself, t stops before it
         local keep = (kind == "df" or kind == "cf") and p + 2 or p + 1
         if kind == "dt" then
-          return { kind = "edit", lines = { L }, cursor = { 1, col }, goal_lines = { L:sub(1, col) .. L:sub(p + 1) }, prompt = "Delete the highlighted text" }
+          return { kind = "edit", lines = { L }, cursor = { 1, col }, goal_lines = { L:sub(1, col) .. L:sub(p + 1) }, prompt = "Delete the struck-through text" }
         elseif kind == "df" then
-          return { kind = "edit", lines = { L }, cursor = { 1, col }, goal_lines = { L:sub(1, col) .. L:sub(p + 2) }, prompt = "Delete the highlighted text" }
+          return { kind = "edit", lines = { L }, cursor = { 1, col }, goal_lines = { L:sub(1, col) .. L:sub(p + 2) }, prompt = "Delete the struck-through text" }
         else
           local new = words.pick(rng, 1, { max_len = 5 })[1]
           if new:sub(1, 1) ~= L:sub(col + 1, col + 1) then
@@ -73,7 +73,7 @@ function U.operator_to_punct(rng, kinds)
               lines = { L },
               cursor = { 1, col },
               goal_lines = { L:sub(1, col) .. new .. L:sub(keep) },
-              prompt = "Change the highlighted text to match the goal line",
+              prompt = "Replace the struck-through text with the green text",
             }
           end
         end

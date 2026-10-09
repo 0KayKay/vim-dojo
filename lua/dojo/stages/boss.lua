@@ -5,15 +5,16 @@ local M = {}
 -- "which move when", after hardtime.nvim's recommended workflow
 local guides = {
   {
-    { "lines up / down", "a count and j k: 4j" },
-    { "a few cells", "h l, or 3l" },
-    { "stray letters", "x, 3x" },
-    { "missing text here", "i a" },
+    { "a line or two up / down", "j k" },
+    { "a few cells", "h l" },
+    { "stray letters", "x" },
+    { "missing text here", "i a: a saves the l" },
     { "missing at a line end", "A I, from anywhere on the line" },
+    { "a slip", "u undoes it" },
   },
   {
     { "lines up / down", "a count and j k: 4j" },
-    { "a few cells", "h l" },
+    { "a few cells", "h l, pressed out" },
     { "word starts", "w b, 3w" },
     { "word ends", "e" },
     { "line edges", "0 ^ $" },

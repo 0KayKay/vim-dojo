@@ -72,7 +72,7 @@ return {
       lines = { line },
       cursor = { 1, col },
       goal_lines = { goal },
-      prompt = "Change the highlighted text to match the goal line",
+      prompt = "Replace the struck-through text with the green text",
     }
   end,
 }

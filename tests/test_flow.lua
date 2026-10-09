@@ -87,7 +87,7 @@ return {
       H.ok(buffer_name():match("dojo://summary$"), "summary buffer")
       H.ok(buffer_text():find("★★★", 1, true), "three stars shown")
       H.eq(progress.stage("counts").best_stars, 3)
-      H.ok(progress.unlocked("x"))
+      H.ok(progress.unlocked("word"))
     end,
   },
   {
@@ -172,7 +172,7 @@ return {
       H.ok(t:find("round 1/6", 1, true), t)
       H.ok(t:find("Drill · basics", 1, true), t)
       H.ok(t:find("par ", 1, true))
-      H.ok(t:find("Learned: h j k l  counts  x  i a  A I  w b", 1, true), t)
+      H.ok(t:find("Learned: h j k l  x  i a  A I  counts  w b", 1, true), t)
       session.abort()
     end,
   },
@@ -197,7 +197,7 @@ return {
       H.ok(t:find(" · ", 1, true), "chain steps are listed: " .. t)
       H.eq(progress.stage("boss_1").best_stars, 3)
       -- beating a boss opens the next world, and skips what is left of this one
-      H.ok(progress.unlocked("word"))
+      H.ok(progress.unlocked("counts"))
       H.ok(progress.unlocked("append"))
     end,
   },
@@ -238,6 +238,84 @@ return {
         H.eq(progress.stage(key).best_stars, 3, key .. " at par earns 3 stars")
       end
       cfg.countdown_s, cfg.pause_success_ms = saved[1], saved[2]
+    end,
+  },
+  {
+    "<CR> in the menu opens the stage page, which names its next step",
+    function()
+      progress.wipe()
+      progress.record_drill("hjkl")
+      progress.record_challenge("hjkl", { stars = 1, score = 1.5 })
+      require("dojo").open()
+      require("dojo.ui.menu").show("hjkl")
+      H.type("<CR>")
+      H.settle(20)
+      H.ok(buffer_name():match("dojo://explainer$"), "the stage page, not the challenge")
+      H.eq(session.current(), nil)
+      local status = vim.wo.statusline
+      H.ok(status:find("start the challenge", 1, true), status)
+      require("dojo.ui.menu").show("x")
+      H.type("<CR>")
+      H.settle(20)
+      H.ok(vim.wo.statusline:find("start the drill", 1, true), vim.wo.statusline)
+    end,
+  },
+  {
+    "a round from a summary can be looked at and played again, unsaved",
+    function()
+      progress.wipe()
+      local cfg = config.get()
+      local saved = cfg.countdown_s
+      cfg.countdown_s = 0
+      require("dojo").open()
+      session.start("x", "challenge", { seed = 31 })
+      play_all()
+      H.ok(buffer_name():match("dojo://summary$"))
+      local before = progress.stage("x").attempts
+      local log = #vim.fn.readfile(progress.dir() .. "/rounds.jsonl")
+      H.type("j")
+      H.type("<CR>")
+      H.settle(20)
+      H.ok(buffer_name():match("dojo://review$"), "the review screen")
+      local hud = table.concat(vim.api.nvim_buf_get_lines(vim.fn.bufnr("dojo://hud"), 0, -1, false), "\n")
+      H.ok(hud:find("round 2 of 8", 1, true), hud)
+      H.ok(hud:find("par ", 1, true), hud)
+      H.type("p")
+      H.ok(vim.wait(2000, round.is_active, 10), "the replay starts")
+      H.ok(buffer_name():match("dojo://play$"))
+      H.eq(session.current(), nil, "a replay is not a session")
+      vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes(
+        require("dojo.ui.review")._round().sol.keys, true, false, true), "xt", false)
+      H.ok(vim.wait(3000, function()
+        return buffer_name():match("dojo://review$") ~= nil
+      end, 10), "back on the review after the replay")
+      hud = table.concat(vim.api.nvim_buf_get_lines(vim.fn.bufnr("dojo://hud"), 0, -1, false), "\n")
+      H.ok(hud:find("Again", 1, true), hud)
+      H.type("q")
+      H.settle(20)
+      H.ok(buffer_name():match("dojo://summary$"), "back on the summary")
+      H.eq(vim.api.nvim_win_get_cursor(0)[1], 6, "on round 2 again")
+      H.eq(progress.stage("x").attempts, before, "nothing saved")
+      H.eq(#vim.fn.readfile(progress.dir() .. "/rounds.jsonl"), log, "nothing logged")
+      cfg.countdown_s = saved
+    end,
+  },
+  {
+    "after a timeout the summary says that u undoes a slip",
+    function()
+      progress.wipe()
+      local cfg = config.get()
+      local saved = { cfg.countdown_s, cfg.time_base_s, cfg.time_per_key_s, cfg.pause_fail_ms }
+      cfg.countdown_s, cfg.time_base_s, cfg.time_per_key_s, cfg.pause_fail_ms = 0, 0.2, 0, 0
+      require("dojo").open()
+      session.start("hjkl", "challenge", { seed = 5 })
+      H.ok(vim.wait(8000, function()
+        return session.current() == nil
+      end, 20), "the challenge ran out")
+      cfg.countdown_s, cfg.time_base_s, cfg.time_per_key_s, cfg.pause_fail_ms = saved[1], saved[2], saved[3], saved[4]
+      local t = buffer_text()
+      H.ok(t:find("time out", 1, true), t)
+      H.ok(t:find("A slip? u undoes it", 1, true), t)
     end,
   },
 }

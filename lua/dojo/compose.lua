@@ -61,32 +61,53 @@ function M.combine(task, rng, ctx)
   end
   local trow, tcol = task_spot(task)
   trow = trow + above
-  -- how far sideways: a few cells until word motions or f/t are known
-  local spread = (ctx.learned.wb or ctx.learned.f) and 10 or 3
-  local r = trow
-  if rng:chance(0.65) then
-    local cands = {}
-    for rr = 1, #t.lines do
-      if rr ~= trow and math.abs(rr - trow) <= 4 then
-        cands[#cands + 1] = rr
+  local r, col
+  if not ctx.learned.count then
+    -- World 1, before counts: at most 3 lines and 3 cells away, 4 presses in
+    -- all (decision 0014)
+    for _ = 1, 20 do
+      local dr = rng:int(0, 3) * (rng:chance(0.5) and 1 or -1)
+      local lo = dr == 0 and 2 or 0
+      local dc = rng:int(lo, math.max(lo, math.min(3, 4 - math.abs(dr)))) * (rng:chance(0.5) and 1 or -1)
+      if t.lines[trow + dr] then
+        r = trow + dr
+        col = U.clamp(tcol + dc, 0, math.max(0, #t.lines[r] - 1))
+        break
       end
     end
-    r = rng:pick(cands)
-  end
-  local line = t.lines[r]
-  local col
-  if r == trow then
-    local off = rng:int(2, math.max(2, spread)) * (rng:chance(0.5) and 1 or -1)
-    col = U.clamp(tcol + off, 0, math.max(0, #line - 1))
+    if not r then
+      r, col = trow, U.clamp(tcol + 2, 0, math.max(0, #t.lines[trow] - 1))
+    end
   else
-    col = U.clamp(tcol + rng:int(-spread, spread), 0, math.max(0, #line - 1))
+    -- how far sideways: a few cells until word motions or f/t are known
+    local spread = (ctx.learned.wb or ctx.learned.f) and 10 or 3
+    r = trow
+    if rng:chance(0.65) then
+      local cands = {}
+      for rr = 1, #t.lines do
+        if rr ~= trow and math.abs(rr - trow) <= 4 then
+          cands[#cands + 1] = rr
+        end
+      end
+      r = rng:pick(cands)
+    end
+    local line = t.lines[r]
+    if r == trow then
+      local off = rng:int(2, math.max(2, spread)) * (rng:chance(0.5) and 1 or -1)
+      col = U.clamp(tcol + off, 0, math.max(0, #line - 1))
+    else
+      col = U.clamp(tcol + rng:int(-spread, spread), 0, math.max(0, #line - 1))
+    end
   end
   t.cursor = { r, col }
   return t
 end
 
 -- A task that fits on one line becomes a chain step:
--- { kind, line, goal_col | goal_line, prompt }
+-- { kind, line, goal_col | goal_line, prompt, spot, end_col, edge }
+-- spot is where the step happens, end_col where the cursor is likely to be
+-- afterwards, and edge marks an insertion at the line's start or end, which
+-- A and I reach from anywhere on the line.
 function M.line_step(task)
   if not task then
     return nil
@@ -95,38 +116,74 @@ function M.line_step(task)
     if task.cursor[1] ~= task.goal[1] then
       return nil
     end
-    return { kind = "move", line = task.lines[task.goal[1]], goal_col = task.goal[2], prompt = task.prompt }
+    local c = task.goal[2]
+    return { kind = "move", line = task.lines[task.goal[1]], goal_col = c, prompt = task.prompt, spot = c, end_col = c }
   end
   if #task.lines ~= 1 or #task.goal_lines ~= 1 then
     return nil
   end
-  return { kind = "edit", line = task.lines[1], goal_line = task.goal_lines[1], prompt = task.prompt }
+  local line, goal = task.lines[1], task.goal_lines[1]
+  local from, to = text.regions({ line }, { goal })
+  local typed = to.ecol - to.scol
+  local end_col = typed > 0 and (to.scol + typed - 1) or U.clamp(from.scol, 0, math.max(0, #goal - 1))
+  local edge = from.empty and (from.scol == 0 or from.scol == #line)
+  return {
+    kind = "edit",
+    line = line,
+    goal_line = goal,
+    prompt = task.prompt,
+    spot = from.scol,
+    end_col = end_col,
+    edge = edge,
+  }
 end
 
--- a plain "go here" step, on a letter (a highlighted space is hard to see)
-function M.spot_step(rng, code)
+-- a plain "go here" step, on a letter (a highlighted space is hard to see);
+-- with near, within that many cells of column `from`
+function M.spot_step(rng, code, from, near)
   local line = filler(rng, code)
-  local col
-  repeat
-    col = rng:int(0, #line - 1)
-  until line:sub(col + 1, col + 1) ~= " "
+  local lo, hi = 0, #line - 1
+  if from and near then
+    lo, hi = math.max(0, from - near), math.min(#line - 1, from + near)
+  end
+  local cands = {}
+  for c = lo, hi do
+    if line:sub(c + 1, c + 1) ~= " " then
+      cands[#cands + 1] = c
+    end
+  end
+  if #cands == 0 then
+    return nil
+  end
+  local col = rng:pick(cands)
   return {
     kind = "move",
     line = line,
     goal_col = col,
     prompt = "Move to the highlighted character",
+    spot = col,
+    end_col = col,
   }
 end
 
--- Stack chain steps on separate lines with filler between them, in shuffled
--- row order so the player travels up and down. Returns lines, the row of each
--- step, and a start cursor that is not on the first step's line.
-function M.layout(rng, steps)
+-- Stack chain steps on separate lines with filler between them. Returns lines,
+-- the row of each step, and a start cursor that is not on the first step's
+-- line. opts.shuffle: rows in random order (once counts make any distance
+-- easy); otherwise in step order, top down or bottom up. opts.near: the start
+-- is at most that many lines and cells from the first step.
+function M.layout(rng, steps, opts)
+  opts = opts or {}
   local order = {}
   for i = 1, #steps do
     order[i] = i
   end
-  rng:shuffle(order)
+  if opts.shuffle then
+    rng:shuffle(order)
+  elseif rng:chance(0.5) then
+    for i = 1, math.floor(#order / 2) do
+      order[i], order[#order - i + 1] = order[#order - i + 1], order[i]
+    end
+  end
   local code = false
   for _, s in ipairs(steps) do
     if s.line:find("[^%w%s]") then
@@ -144,11 +201,29 @@ function M.layout(rng, steps)
   if #lines == 1 or rng:chance(0.5) then -- the start must be on another line
     lines[#lines + 1] = filler(rng, code)
   end
-  local r
-  repeat
-    r = rng:int(1, #lines)
-  until r ~= rows[1]
-  return lines, rows, { r, rng:int(0, math.max(0, #lines[r] - 1)) }
+  local cands = {}
+  for r = 1, #lines do
+    if r ~= rows[1] and (not opts.near or math.abs(r - rows[1]) <= opts.near) then
+      cands[#cands + 1] = r
+    end
+  end
+  if #cands == 0 then -- no other line near: add one next to the first step
+    table.insert(lines, rows[1] + 1, filler(rng, code))
+    for i, r in ipairs(rows) do
+      if r > rows[1] then
+        rows[i] = r + 1
+      end
+    end
+    cands = { rows[1] + 1 }
+  end
+  local r = rng:pick(cands)
+  local col
+  if opts.near and not steps[1].edge then
+    col = U.clamp(steps[1].spot + rng:int(-opts.near, opts.near), 0, math.max(0, #lines[r] - 1))
+  else
+    col = rng:int(0, math.max(0, #lines[r] - 1))
+  end
+  return lines, rows, { r, col }
 end
 
 -- The sub-task for chain step i, given the buffer, cursor and remembered

@@ -4,6 +4,7 @@ local text = require("dojo.text")
 local keys = require("dojo.keys")
 local solver = require("dojo.solver")
 local config = require("dojo.config")
+local marks = require("dojo.marks")
 
 local M = {}
 
@@ -27,43 +28,13 @@ function M.prepare_buffer(buf)
   end, { buffer = buf, nowait = true, desc = "Vim Dojo: show the intended solution" })
 end
 
--- Highlights: target cell for move rounds; for edit rounds the span to change
--- and a ghost goal line under the changed lines when there is text to type.
+-- Marks: the target cell for move rounds, the change in place for edit
+-- rounds (dojo.marks, decision 0016).
 local function decorate(buf, task)
-  vim.api.nvim_buf_clear_namespace(buf, ns, 0, -1)
   if task.kind == "move" then
-    local r, c = task.goal[1], task.goal[2]
-    vim.api.nvim_buf_set_extmark(buf, ns, r - 1, c, { end_col = c + 1, hl_group = "DojoTarget", priority = 200 })
-    return
-  end
-  local from, to = text.regions(task.lines, task.goal_lines)
-  if not from.empty then
-    vim.api.nvim_buf_set_extmark(buf, ns, from.srow - 1, from.scol, {
-      end_row = from.erow - 1,
-      end_col = from.ecol,
-      hl_group = "DojoDelete",
-      hl_eol = from.ecol == 0 and from.erow > from.srow,
-      priority = 200,
-    })
-  end
-  if not to.empty then
-    -- ghost of each goal line that contains new text, under the last changed line
-    local virt = {}
-    for gr = to.srow, to.erow do
-      local gl = task.goal_lines[gr] or ""
-      local s = gr == to.srow and to.scol or 0
-      local e = gr == to.erow and to.ecol or #gl
-      virt[#virt + 1] = {
-        { gl:sub(1, s), "DojoGhost" },
-        { gl:sub(s + 1, e), "DojoGoal" },
-        { gl:sub(e + 1), "DojoGhost" },
-      }
-    end
-    local anchor = math.min(from.erow, #task.lines) - 1
-    if from.ecol == 0 and from.erow > from.srow then
-      anchor = from.erow - 2
-    end
-    vim.api.nvim_buf_set_extmark(buf, ns, math.max(anchor, 0), 0, { virt_lines = virt })
+    marks.target(buf, ns, task.goal[1], task.goal[2])
+  else
+    marks.edit(buf, ns, task.lines, task.goal_lines)
   end
 end
 
@@ -295,6 +266,25 @@ function M.start(o)
     group = group,
     callback = function()
       vim.schedule(check)
+    end,
+  })
+  -- the marks always show what is left to do (decision 0016)
+  vim.api.nvim_create_autocmd({ "TextChanged", "TextChangedI" }, {
+    group = group,
+    buffer = o.buf,
+    callback = function()
+      if active ~= a or a.done then
+        return
+      end
+      local task = o.task
+      if task.kind == "chain" then
+        local st = task.steps[a.step]
+        if st.kind == "edit" then
+          decorate(o.buf, step_task(o.buf, st))
+        end
+      elseif task.kind == "edit" then
+        decorate(o.buf, { kind = "edit", lines = vim.api.nvim_buf_get_lines(o.buf, 0, -1, false), goal_lines = task.goal_lines })
+      end
     end,
   })
   a.timer = vim.uv.new_timer()
