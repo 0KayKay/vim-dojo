@@ -18,6 +18,11 @@ local function keys_of(res)
   return table.concat(parts)
 end
 
+-- cut long keys short, but don't pad short ones
+local function clip(s, w)
+  return render.width(s) <= w and s or render.fit(s, w)
+end
+
 local function back()
   layout.close_hud()
   local i = cur and cur.i
@@ -38,23 +43,25 @@ local function map(buf)
   end, o)
 end
 
-local mode_name = { drill = "Drill", challenge = "Challenge", boss = "Boss" }
+local mode_name = { drill = "Drill", challenge = "Challenge" }
 
 local function header(s, i, r)
   local width = layout.hud_width()
-  local title = string.format(" %s %s · %s · round %d of %d", s.stage.id, s.stage.title, mode_name[s.mode], i, #s.rounds)
+  local what = s.mode == "boss" and string.format("World %d boss", s.stage.world)
+    or string.format("%s · %s", s.stage.title, mode_name[s.mode])
+  local title = string.format(" %s %s · round %d of %d", s.stage.id, what, i, #s.rounds)
   local right = string.format("seed %d ", r.task.seed or s.seed)
   local prompt = r.task.steps and string.format("A chain of %d steps, done in order", #r.task.steps) or r.task.prompt
   local you
   if r.solved then
     you = {
       { " You: " },
-      { keys_of(r.result), "DojoKey" },
+      { clip(keys_of(r.result), 24), "DojoKey" },
       { string.format("  %d %s ", r.count, r.count == 1 and "key" or "keys") },
       { score.stars_text(r.stars), "DojoStar" },
     }
   else
-    you = { { " You: " }, { keys_of(r.result), "DojoKey" }, { "  time out", "DojoBad" } }
+    you = { { " You: " }, { clip(keys_of(r.result), 24), "DojoKey" }, { "  time out", "DojoBad" } }
   end
   you[#you + 1] = { string.format(" · par %d: ", r.par) }
   you[#you + 1] = { r.sol.display, "DojoKey" }
