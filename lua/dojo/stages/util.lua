@@ -57,17 +57,26 @@ function U.operator_to_punct(rng, kinds)
     end
     if U.is_punct(ch) and #starts > 0 then
       local col = rng:pick(starts)
-      if not L:sub(col + 2, p):find(ch, 1, true) then
+      -- The span holds a space or a mark and doesn't start the line, so no
+      -- single e, w or 0 can do the job; such rounds would only be thrown
+      -- away after a costly solve.
+      if col > 0 and not L:sub(col + 2, p):find(ch, 1, true) and L:sub(col + 1, p):find("[^%w_]") then
         local kind = rng:pick(kinds)
         -- f takes the mark itself, t stops before it
-        local keep = (kind == "df" or kind == "cf") and p + 2 or p + 1
-        if kind == "dt" then
+        local f = kind == "df" or kind == "cf"
+        local keep = f and p + 2 or p + 1
+        if f and p == #L - 1 then
+          kind = nil -- the last mark of the line: d$ or c$ would do
+        end
+        if kind == nil then -- try another span
+        elseif kind == "dt" then
           return { kind = "edit", lines = { L }, cursor = { 1, col }, goal_lines = { L:sub(1, col) .. L:sub(p + 1) }, prompt = "Delete the struck-through text" }
         elseif kind == "df" then
           return { kind = "edit", lines = { L }, cursor = { 1, col }, goal_lines = { L:sub(1, col) .. L:sub(p + 2) }, prompt = "Delete the struck-through text" }
         else
           local new = words.pick(rng, 1, { max_len = 5 })[1]
-          if new:sub(1, 1) ~= L:sub(col + 1, col + 1) then
+          -- no letter shared at either end, so the whole span really changes
+          if new:sub(1, 1) ~= L:sub(col + 1, col + 1) and new:sub(-1) ~= L:sub(keep - 1, keep - 1) then
             return {
               kind = "edit",
               lines = { L },
