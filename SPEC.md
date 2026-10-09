@@ -130,9 +130,9 @@ and the next round starts on its own.
   anything else.
 - *Combined rounds:* a basic round placed in a taller buffer, with the cursor
   starting on another line or further away, so the new move has to follow an
-  earlier one (`3jA` for `A`, `2j$` for `$`). In World 1 the start is at most
-  3 presses away (`jjA…`, `lla…`). Some stages have their own combined rounds
-  too, such as `df,` and `ct)` for `f` and `t`.
+  earlier one (`3jA` for `A`, `2j$` for `$`). In World 1 the start is a few
+  presses away, at most 4 in all (`jjA…`, `lla…`). Some stages have their own
+  combined rounds too, such as `df,` and `ct)` for `f` and `t`.
 - *Chains* (bosses only): 2–3 steps on different lines of one buffer, each a
   move or an edit, done in order. Only the current step is highlighted and the
   header shows `step 2/3`; the text can be changed only during edit steps. The
@@ -170,7 +170,7 @@ countdown.
 | Key | Action |
 | --- | --- |
 | `<Tab>` | Hint: shows the intended solution. In a challenge, that round can then earn at most 1 star. |
-| `:q` | Back to the menu (it closes the play window; the header window becomes the menu). An unfinished drill or challenge is discarded. |
+| `:q` | Back to the menu (it closes the play window; the header window becomes the menu). An unfinished drill or challenge is discarded. When replaying a round from a summary, back to its review. |
 
 The play window's status line names both keys.
 
@@ -184,7 +184,8 @@ menu and saved (docs/decisions/0011). It acts only in challenges and bosses of
 stages where counts are already learned (2.1 and later); drills stay forgiving.
 Pressing the same one of `h j k l w b e` four times in a row within 1 s blocks
 the fourth press: the key does nothing, is not counted, and the header suggests
-a better move. Three presses are fine, as in hardtime.nvim, because `lll` is the
+a better move: a count for `j k w b e` (`4j`); for `h l`, the word motions and
+`f`/`t` once they are known. Three presses are fine, as in hardtime.nvim, because `lll` is the
 natural way to go three cells (docs/decisions/0014). Any other key in between
 starts over, so a par like `jhj` followed quickly by the next step's `j` is
 never blocked. The character after `f`, `t`, `r` and similar is never
@@ -252,7 +253,8 @@ Distances stay *natural*: what a person would do without counting letters.
 
 - `h` and `l` never take a count, in any world. A few cells are pressed out
   (`lll`); anything further is a job for `w b e`, `f t` or `c`.
-- In World 1, before counts, a target is at most 3 lines and 3 cells away.
+- In World 1, before counts, a target is at most 3 lines and 3 cells away,
+  and at most 4 presses of `h j k l` in all.
 - Later, vertical targets use the relative line numbers (2 to 8 lines) and word
   targets are at most 4 words away, so the count can be seen rather than
   counted.
@@ -260,7 +262,8 @@ Distances stay *natural*: what a person would do without counting letters.
 The solver only tries counts up to 4 on `w b e`, so `6b` across two lines is
 never par (a player may still type it and beat par). A round, or a chain step,
 is regenerated when its par breaks these rules: more than 3 presses of `h`/`l`
-or of `j`/`k`, or the same counted move three times (`4j4j4j`).
+or of `j`/`k`, in World 1 more than 4 presses of `h j k l` in all, or the same
+counted move three times (`4j4j4j`).
 
 **World 1 · First steps** (vimtutor lesson 1)
 
@@ -415,8 +418,8 @@ rounds, when one timed out, a tip says that `u` undoes a slip.
 with its marks and the cursor where it began, and in the header your keys, par
 with the intended solution and the alternatives (for a chain, each step's
 solution). `p` plays it again without a clock and without saving anything; the
-result shows in the header and `p` plays it once more. `q` goes back to the
-summary (docs/decisions/0017).
+result shows in the header and `p` plays it once more; `:q` during the replay
+returns to the review. `q` goes back to the summary (docs/decisions/0017).
 
 ```
  2.2 w b · Challenge · round 3 of 8                              seed 48121
