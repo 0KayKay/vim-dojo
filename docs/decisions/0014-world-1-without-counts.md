@@ -24,10 +24,13 @@ were no better than later worlds despite the simpler moves.
 - World 1 is `h j k l`, `x`, `i a`, `A I` and its boss, without counts. Counts
   open World 2 (2.1), before `w b`.
 - `h` and `l` never take a count in the solver, in any world. `x` keeps counts
-  2–4.
+  2–4, and `w b e` now stop at 4 as well (they were 2–9): the round log showed
+  World 2 chains timing out on pars like `7b` and `8be`, which wrap across
+  lines and have to be counted word by word. `j` and `k` keep 2–9, read off the
+  relative line numbers.
 - Distances are natural: in World 1 a target is at most 3 lines and 3 cells
-  away; everywhere, a par with more than 3 presses of `h`/`l` or `j`/`k`, a count
-  above 4 on `w b e`, or the same counted move three times is regenerated.
+  away; everywhere, a par with more than 3 presses of `h`/`l` or `j`/`k`, or the
+  same counted move three times is regenerated.
 - Stray letters for `x` are 1 or 2, at the start or end of a word, near the
   cursor. In 1.4 (`A I`) the cursor starts mid-line so `A`/`I` are the point.
 - Habit mode blocks the fourth press of a key in a row, not the third, as

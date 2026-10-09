@@ -257,9 +257,10 @@ Distances stay *natural*: what a person would do without counting letters.
   targets are at most 4 words away, so the count can be seen rather than
   counted.
 
-A round, or a chain step, is regenerated when its par breaks these rules: more
-than 3 presses of `h`/`l` or of `j`/`k`, a count above 4 on `w b e`, or the same
-counted move three times (`4j4j4j`).
+The solver only tries counts up to 4 on `w b e`, so `6b` across two lines is
+never par (a player may still type it and beat par). A round, or a chain step,
+is regenerated when its par breaks these rules: more than 3 presses of `h`/`l`
+or of `j`/`k`, or the same counted move three times (`4j4j4j`).
 
 **World 1 · First steps** (vimtutor lesson 1)
 
@@ -446,9 +447,9 @@ Vim's motion rules, which is where hand-written par goes wrong (`cw` acting like
 - State is the text, cursor and wanted column (`curswant`), so `$` then `j` is
   modelled correctly.
 - Candidates are only learned moves and `f`/`t` targets taken from characters
-  on the current line (not space). Counts are 2–9 for `j k w b e`, where
-  relative numbers and word starts make them easy to see, 2–4 for `x`, and none
-  for `h l`: nobody counts letters at a glance, and `7x` should not beat `dt,`
+  on the current line (not space). Counts are 2–9 for `j k`, read off the
+  relative line numbers; 2–4 for `w b e` and `x`, which are counted by eye; and
+  none for `h l`: nobody counts letters at a glance, and `7x` should not beat `dt,`
   ([decisions 0007](docs/decisions/0007-count-limits.md) and
   [0014](docs/decisions/0014-world-1-without-counts.md)).
 - Commands that end in Insert mode (`i a A I c…`) are tried as finishers: the
@@ -604,7 +605,7 @@ through `require("dojo").setup()`, because playtesting will move most of them.
 | Habit hint | run of 3+ identical presses of `j k w b e x` |
 | Distances | World 1: 3 lines, 3 cells; later: 8 lines, 4 words; `h`/`l` at most 3 presses |
 | Solver cost limit | 10 keys for move rounds, 16 for edit rounds, 12 per chain step |
-| Counts the solver tries | 2–9 for `j k w b e`, 2–4 for `x`, none for `h l` |
+| Counts the solver tries | 2–9 for `j k`, 2–4 for `w b e x`, none for `h l` |
 | Seeds per stage in tests | 200 per round kind |
 
 The number of combined rounds in a challenge is the main lever for a future
