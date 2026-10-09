@@ -115,10 +115,11 @@ function M.practice()
   local s, i = cur.s, cur.i
   local r = s.rounds[i]
   local hud = require("dojo.ui.hud")
-  local buf, win = layout.play()
+  local buf, win = layout.show("play", { play = true, status = " <Tab> hint   :q back to the review" })
   if vim.api.nvim_get_current_win() ~= win then
     vim.api.nvim_set_current_win(win)
   end
+  cur.playing = true
   local ps = { stage = s.stage, mode = "practice", learned = s.learned, plan = s.rounds }
   local pr = { index = i, task = r.task, sol = r.sol, step = 1, variant = r.variant }
   hud.round(ps, pr)
@@ -132,8 +133,11 @@ function M.practice()
         return
       end
       cur.try = res
+      cur.playing = false
       vim.defer_fn(function()
-        if cur and cur.s == s and layout.main_win() then
+        -- only if the player is still looking at the replay
+        local w = layout.main_win()
+        if cur and cur.s == s and w and vim.api.nvim_win_get_buf(w) == buf then
           M.show(s, i)
         end
       end, 600)
@@ -151,6 +155,19 @@ function M.practice()
     end,
     on_blocked = function() end,
   })
+end
+
+-- is a replay running? (for :q and leaving the tab, which return here)
+function M.replaying()
+  return cur ~= nil and cur.playing == true and round.is_active()
+end
+
+-- back to the review after a replay was stopped
+function M.resume()
+  if cur then
+    cur.playing = false
+    M.show(cur.s, cur.i)
+  end
 end
 
 -- for tests: the round on screen

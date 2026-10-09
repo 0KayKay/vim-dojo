@@ -280,6 +280,16 @@ return {
       local hud = table.concat(vim.api.nvim_buf_get_lines(vim.fn.bufnr("dojo://hud"), 0, -1, false), "\n")
       H.ok(hud:find("round 2 of 8", 1, true), hud)
       H.ok(hud:find("par ", 1, true), hud)
+      local shown = require("dojo.ui.review")._round()
+      H.eq(vim.api.nvim_buf_get_lines(0, 0, -1, false), shown.task.lines, "the text as the round started")
+      H.eq(vim.api.nvim_win_get_cursor(0), shown.task.cursor, "the cursor where it started")
+      -- :q during a replay goes back to the review, not the menu
+      H.type("p")
+      H.ok(vim.wait(2000, round.is_active, 10))
+      H.type(":q<CR>")
+      H.settle(50)
+      H.ok(buffer_name():match("dojo://review$"), ":q in a replay: " .. buffer_name())
+      H.ok(not round.is_active(), "the replay stopped")
       H.type("p")
       H.ok(vim.wait(2000, round.is_active, 10), "the replay starts")
       H.ok(buffer_name():match("dojo://play$"))
@@ -316,6 +326,74 @@ return {
       local t = buffer_text()
       H.ok(t:find("time out", 1, true), t)
       H.ok(t:find("A slip? u undoes it", 1, true), t)
+    end,
+  },
+  {
+    ":Dojo from a review or a replay leaves just the menu",
+    function()
+      progress.wipe()
+      local cfg = config.get()
+      local saved = cfg.countdown_s
+      cfg.countdown_s = 0
+      require("dojo").open()
+      -- windows in the game tab, without the solver's hidden scratch float
+      local function windows()
+        return vim.tbl_filter(function(w)
+          return vim.api.nvim_win_get_config(w).relative == ""
+        end, vim.api.nvim_tabpage_list_wins(0))
+      end
+      session.start("hjkl", "drill", { seed = 12 })
+      play_all()
+      H.type("<CR>")
+      H.settle(20)
+      H.ok(buffer_name():match("dojo://review$"))
+      vim.cmd("Dojo")
+      H.settle(20)
+      H.ok(buffer_name():match("dojo://menu$"))
+      H.eq(#windows(), 1, "no header left over the menu")
+      -- and from a replay
+      session.start("hjkl", "drill", { seed = 13 })
+      play_all()
+      H.type("<CR>")
+      H.settle(20)
+      H.type("p")
+      H.ok(vim.wait(2000, round.is_active, 10))
+      vim.cmd("Dojo")
+      H.settle(20)
+      H.ok(not round.is_active(), "the replay stopped")
+      H.ok(buffer_name():match("dojo://menu$"))
+      H.eq(#windows(), 1, "no header left over the menu")
+      cfg.countdown_s = saved
+    end,
+  },
+  {
+    "habit mode's message suggests a count, or for l a word motion",
+    function()
+      progress.wipe()
+      local cfg = config.get()
+      local saved = cfg.countdown_s
+      cfg.countdown_s = 0
+      require("dojo").open()
+      session.start("word", "challenge", { seed = 21 })
+      H.ok(wait_round(1))
+      local hud = vim.fn.bufnr("dojo://hud")
+      local function header()
+        return table.concat(vim.api.nvim_buf_get_lines(hud, 0, -1, false), "\n")
+      end
+      H.type("l")
+      H.type("l")
+      H.type("l")
+      H.type("l")
+      H.settle(30)
+      H.ok(header():find("llll blocked. Try a word motion, like w e", 1, true), header())
+      H.type("j")
+      H.type("j")
+      H.type("j")
+      H.type("j")
+      H.settle(30)
+      H.ok(header():find("jjjj blocked. Try a count, like 4j", 1, true), header())
+      session.abort()
+      cfg.countdown_s = saved
     end,
   },
 }

@@ -21,7 +21,7 @@ end
 local function step(dir)
   local i = selected_round()
   local n = #last.s.rounds
-  local target = i and math.max(1, math.min(n, i + dir)) or 1
+  local target = i and math.max(1, math.min(n, i + dir)) or (dir > 0 and 1 or n)
   if round_line[target] then
     vim.api.nvim_win_set_cursor(0, { round_line[target], 0 })
   end

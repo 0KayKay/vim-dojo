@@ -74,7 +74,7 @@ end
 -- Does a par break the natural-distance rules (SPEC §7, decision 0014)? More
 -- than 3 presses of h/l or of j/k, a count above 4 on w b e (d5w too), or the
 -- same counted move three times (4j4j4j). Returns the reason, or nil.
-local function unnatural(sol)
+local function unnatural(sol, max_moves)
   local hl, jk, seen = 0, 0, {}
   for _, t in ipairs(sol.tokens) do
     local k = t.keys
@@ -100,9 +100,17 @@ local function unnatural(sol)
   if jk > 3 then
     return "more than 3 presses of j/k"
   end
+  if max_moves and hl + jk > max_moves then
+    return "more than " .. max_moves .. " presses of h j k l in all"
+  end
   return nil
 end
 M.unnatural = unnatural
+
+-- World 1, before counts: at most 4 presses of h j k l in all (SPEC §7)
+local function max_moves(ctx)
+  return not ctx.learned.count and 4 or nil
+end
 
 -- Would habit mode block this solution? More presses of one habit key in a
 -- row than habit mode allows (kkkk); typed text does not count.
@@ -206,9 +214,9 @@ local function make_chain(spec, ctx, rng)
         st.row = rows[i]
         local sub = compose.step_task(st, state.lines, state.cursor, state.curswant)
         local sol = solver.solve(sub, ctx.learned, { focus = st.focus, max_cost = config.get().solver.max_cost_chain_step })
-        if not sol or sol.cost == 0 or unnatural(sol) or not solver.check(sub, sol.tokens) then
+        if not sol or sol.cost == 0 or unnatural(sol, max_moves(ctx)) or not solver.check(sub, sol.tokens) then
           if M.debug then
-            M.debug(sol and (unnatural(sol) or "check") or "no solution", sol and sol.display)
+            M.debug(sol and (unnatural(sol, max_moves(ctx)) or "check") or "no solution", sol and sol.display)
           end
           ok = false
           break
@@ -263,7 +271,7 @@ function M.make_round(spec, ctx, rng)
       task.seed = seed
       task.stage = st.key
       local sol = solver.solve(task, ctx.learned, { focus = st.focus })
-      if sol and sol.cost > 0 and not unnatural(sol) and meets(spec, st, sol, ctx) and solver.check(task, sol.tokens) then
+      if sol and sol.cost > 0 and not unnatural(sol, max_moves(ctx)) and meets(spec, st, sol, ctx) and solver.check(task, sol.tokens) then
         return {
           task = task,
           sol = sol,
@@ -282,12 +290,12 @@ function M.current()
   return cur
 end
 
+-- stop whatever runs: a session, or a replay from a review (which has no
+-- session), and close the header
 function M.abort()
   round.abort()
-  if cur then
-    cur = nil
-    require("dojo.ui.layout").close_hud()
-  end
+  cur = nil
+  require("dojo.ui.layout").close_hud()
 end
 
 local function hud()

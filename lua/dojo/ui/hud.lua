@@ -79,12 +79,29 @@ function M.hint(s, r)
   draw(s, r, r.elapsed)
 end
 
+-- a better move than pressing key again: a count, or for h and l (which
+-- take no counts) the moves made for longer trips (SPEC §5 Habit mode).
+-- Returns the advice and an example in key notation (or nil).
+local function better(key, learned)
+  if key ~= "h" and key ~= "l" then
+    return " blocked. Try a count, like ", "4" .. key
+  end
+  local fwd = key == "l"
+  if learned.f then
+    return " blocked. Try a word motion or f/t, like ", fwd and "w e f" or "b F"
+  elseif learned.wb then
+    return " blocked. Try a word motion, like ", fwd and "w e" or "b"
+  end
+  return " blocked: three presses at most.", nil
+end
+
 function M.blocked(s, r, key)
+  local advice, example = better(key, s.learned)
   s.last = {
     { " Habit mode: ", "DojoWarn" },
-    { key .. key .. key, "DojoKey" },
-    { " blocked. Try a count, like ", "DojoDim" },
-    { "3" .. key, "DojoKey" },
+    { string.rep(key, config.get().habit.grace + 1), "DojoKey" },
+    { advice, "DojoDim" },
+    { example or "", "DojoKey" },
   }
   draw(s, r, r.elapsed)
 end

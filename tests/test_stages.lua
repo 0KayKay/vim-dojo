@@ -19,12 +19,13 @@ local function ctx(key, mode)
   return { learned = curriculum.learned_through(key), mode = mode, key = key, world = st.world }
 end
 
-local function common(r, what)
+-- world: the round's world; World 1 allows 4 presses of h j k l in all
+local function common(r, what, world)
   local task, sol = r.task, r.sol
   H.ok(not table.concat(task.lines, "\n"):find(solver.SENTINEL, 1, true), "sentinel in text: " .. what)
   H.ok(sol.cost > 0, "round already solved at start: " .. what)
   for _, part in ipairs(task.steps or { r }) do -- chains: per step
-    local why = session.unnatural(part.sol)
+    local why = session.unnatural(part.sol, world == 1 and 4 or nil)
     H.ok(not why, string.format("unnatural par (%s): %s %s", tostring(why), what, part.sol.display))
   end
 end
@@ -58,7 +59,7 @@ for _, key in ipairs(curriculum.order) do
               local r = session.make_round({ key = key, variant = variant }, c, rng)
               slowest = math.max(slowest, (vim.uv.hrtime() - t0) / 1e6)
               local what = string.format("seed %d %s", r.task.seed, r.sol.keys)
-              common(r, what)
+              common(r, what, st.world)
               H.ok(solver.check(r.task, r.sol.tokens), "intended does not replay: " .. what)
               if st.world == 1 then
                 H.ok(not r.concepts.count, "World 1 has no counts: " .. what)
@@ -94,7 +95,7 @@ for w = 1, #curriculum.worlds do
         local r = session.make_round({ variant = "mixed" }, c, rng)
         slowest = math.max(slowest, (vim.uv.hrtime() - t0) / 1e6)
         local what = string.format("seed %d %s", r.task.seed, r.sol.keys)
-        common(r, what)
+        common(r, what, w)
         H.ok(solver.check(r.task, r.sol.tokens), "does not replay: " .. what)
         H.ok(uses_world(r.concepts, w), "no move from this world: " .. what)
         H.ok(#moves.other_moves(r.concepts) >= 2, "fewer than two moves: " .. what)
@@ -116,7 +117,7 @@ for w = 1, #curriculum.worlds do
           slowest = math.max(slowest, (vim.uv.hrtime() - t0) / 1e6)
           local task = r.task
           local what = string.format("seed %d %s", task.seed, r.sol.display)
-          common(r, what)
+          common(r, what, w)
           H.eq(#task.steps, steps, what)
           H.ok(uses_world(r.concepts, w), "no move from this world: " .. what)
           -- replay each step's intended keys from where the last one ended
@@ -251,6 +252,8 @@ cases[#cases + 1] = {
     H.ok(session.unnatural(sol("d6b")), "six words back, with d")
     H.ok(not session.unnatural(sol("8j", "4w")), "lines by count, four words")
     H.ok(session.unnatural(sol("4j", "4j", "x", "4j")), "the same counted move three times")
+    H.ok(not session.unnatural(sol("j", "j", "l", "l", "x"), 4), "four presses in World 1")
+    H.ok(session.unnatural(sol("j", "j", "l", "l", "l", "x"), 4), "five presses in World 1")
   end,
 }
 

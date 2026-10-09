@@ -205,8 +205,9 @@ function M.solve(task, learned, opts)
       if cur_text ~= t then
         vim.api.nvim_buf_set_lines(buf, 0, -1, false, info(t).lines)
         cur_text = t
+        marked_text = nil -- replacing the lines moves the marks off their places
       end
-      if marked_text ~= t then
+      if marked_text ~= t or opts.fresh_marks then -- fresh_marks: tests only
         mark(buf, task, info(t).lines)
         marked_text = t
       end

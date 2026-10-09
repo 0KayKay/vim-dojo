@@ -111,4 +111,23 @@ return {
       H.eq(solver.run(task, { { keys = "j" } }).cursor, real, "the solver agrees")
     end,
   },
+  {
+    "the solver's marks never go stale: same par as redrawing them every time",
+    function()
+      local Rng = require("dojo.rng")
+      local curriculum = require("dojo.curriculum")
+      local session = require("dojo.session")
+      local solver = require("dojo.solver")
+      for _, key in ipairs({ "change", "insert", "lines" }) do
+        local st = curriculum.get(key)
+        local ctx = { learned = curriculum.learned_through(key), mode = "challenge", key = key, world = st.world }
+        local rng = Rng.new(404)
+        for _ = 1, 15 do
+          local r = session.make_round({ key = key, variant = "combined" }, ctx, rng)
+          local fresh = solver.solve(r.task, ctx.learned, { focus = st.focus, fresh_marks = true })
+          H.eq(r.sol.cost, fresh.cost, key .. " seed " .. r.task.seed .. ": " .. r.sol.display .. " vs " .. fresh.display)
+        end
+      end
+    end,
+  },
 }

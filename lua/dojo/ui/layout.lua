@@ -77,11 +77,19 @@ function M.open()
   vim.api.nvim_create_autocmd("TabLeave", {
     group = group,
     callback = function()
-      if vim.api.nvim_get_current_tabpage() == state.tab and require("dojo.session").current() then
+      if vim.api.nvim_get_current_tabpage() ~= state.tab then
+        return
+      end
+      local replay = require("dojo.ui.review").replaying()
+      if require("dojo.session").current() or replay then
         vim.schedule(function()
           require("dojo.session").abort()
           if valid_win(state.win) then
-            require("dojo.ui.menu").show()
+            if replay then
+              require("dojo.ui.review").resume()
+            else
+              require("dojo.ui.menu").show()
+            end
           end
         end)
       end
@@ -114,6 +122,7 @@ function M.watch(win)
     once = true,
     callback = function()
       local hud = state.hud
+      local replay = require("dojo.ui.review").replaying()
       state.win, state.hud = nil, nil
       require("dojo.round").abort()
       vim.schedule(function()
@@ -122,7 +131,11 @@ function M.watch(win)
           state.win = hud
           wset(hud, "winfixheight", false)
           M.watch(hud)
-          require("dojo.ui.menu").show()
+          if replay then
+            require("dojo.ui.review").resume() -- :q in a replay: back to its review
+          else
+            require("dojo.ui.menu").show()
+          end
         end
       end)
     end,
