@@ -477,10 +477,11 @@ Vim's motion rules, which is where hand-written par goes wrong (`cw` acting like
   world", and what the boss concept report is built on.
 - Alternatives: the same search with the intended solution's main move banned,
   and with counts banned.
-- Measured on 0.12.5: most rounds take under 20 ms; the slowest are combined
-  rounds in Worlds 3 and 4, where every `d`/`c` motion is a candidate on a
-  taller buffer (up to about 450 ms), and World 4 chains (up to about 200 ms
-  per step). Rounds are generated one ahead, during the pause between rounds.
+- Measured on 0.12.5 (version 0.6): most rounds take under 20 ms; the slowest
+  are combined rounds in Worlds 3 and 4, where every `d`/`c` motion is a
+  candidate on a taller buffer (up to about 400 ms), and World 4 chains (up to
+  about 210 ms per step). Drawing the marks in the solver costs about 10 %.
+  Rounds are generated one ahead, during the pause between rounds.
 
 **What happens in a round.**
 
