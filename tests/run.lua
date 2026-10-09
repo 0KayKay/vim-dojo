@@ -3,6 +3,8 @@
 local root = vim.fn.fnamemodify(debug.getinfo(1, "S").source:sub(2), ":p:h:h")
 vim.opt.rtp:prepend(root)
 vim.cmd.runtime("plugin/dojo.lua") -- defines :Dojo, as a plugin manager would
+vim.o.showmode = false -- keep "-- INSERT --" out of the test output
+vim.o.report = 9999 -- and "3 fewer lines"
 package.path = root .. "/tests/?.lua;" .. package.path
 
 -- keep test data out of the real data dir

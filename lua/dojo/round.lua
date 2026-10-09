@@ -4,6 +4,7 @@ local text = require("dojo.text")
 local keys = require("dojo.keys")
 local solver = require("dojo.solver")
 local config = require("dojo.config")
+local marks = require("dojo.marks")
 
 local M = {}
 
@@ -27,44 +28,34 @@ function M.prepare_buffer(buf)
   end, { buffer = buf, nowait = true, desc = "Vim Dojo: show the intended solution" })
 end
 
--- Highlights: target cell for move rounds; for edit rounds the span to change
--- and a ghost goal line under the changed lines when there is text to type.
+-- Marks: the target cell for move rounds, the change in place for edit
+-- rounds (dojo.marks, decision 0016).
 local function decorate(buf, task)
-  vim.api.nvim_buf_clear_namespace(buf, ns, 0, -1)
   if task.kind == "move" then
-    local r, c = task.goal[1], task.goal[2]
-    vim.api.nvim_buf_set_extmark(buf, ns, r - 1, c, { end_col = c + 1, hl_group = "DojoTarget", priority = 200 })
-    return
+    marks.target(buf, ns, task.goal[1], task.goal[2])
+  else
+    marks.edit(buf, ns, task.lines, task.goal_lines)
   end
-  local from, to = text.regions(task.lines, task.goal_lines)
-  if not from.empty then
-    vim.api.nvim_buf_set_extmark(buf, ns, from.srow - 1, from.scol, {
-      end_row = from.erow - 1,
-      end_col = from.ecol,
-      hl_group = "DojoDelete",
-      hl_eol = from.ecol == 0 and from.erow > from.srow,
-      priority = 200,
-    })
+end
+
+-- A chain step, as a task on the buffer as it is now (SPEC §5 Chains).
+local function step_task(buf, step)
+  local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+  if step.kind == "move" then
+    return { kind = "move", lines = lines, goal = { step.row, step.goal_col } }
   end
-  if not to.empty then
-    -- ghost of each goal line that contains new text, under the last changed line
-    local virt = {}
-    for gr = to.srow, to.erow do
-      local gl = task.goal_lines[gr] or ""
-      local s = gr == to.srow and to.scol or 0
-      local e = gr == to.erow and to.ecol or #gl
-      virt[#virt + 1] = {
-        { gl:sub(1, s), "DojoGhost" },
-        { gl:sub(s + 1, e), "DojoGoal" },
-        { gl:sub(e + 1), "DojoGhost" },
-      }
-    end
-    local anchor = math.min(from.erow, #task.lines) - 1
-    if from.ecol == 0 and from.erow > from.srow then
-      anchor = from.erow - 2
-    end
-    vim.api.nvim_buf_set_extmark(buf, ns, math.max(anchor, 0), 0, { virt_lines = virt })
+  local goal = vim.deepcopy(lines)
+  goal[step.row] = step.goal_line
+  return { kind = "edit", lines = lines, goal_lines = goal }
+end
+
+-- Move rounds are read-only; in chains, only while the step is a move, so a
+-- stray x can't shift the highlighted target away from the checked one.
+local function editable(task, step)
+  if task.kind == "chain" then
+    return task.steps[step or 1].kind == "edit"
   end
+  return task.kind == "edit"
 end
 
 function M.load(buf, win, task)
@@ -73,9 +64,13 @@ function M.load(buf, win, task)
   vim.bo[buf].undolevels = -1 -- a change with undolevels -1 clears undo history
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, task.lines)
   vim.bo[buf].undolevels = ul
-  vim.bo[buf].modifiable = task.kind == "edit"
+  vim.bo[buf].modifiable = editable(task)
   vim.bo[buf].modified = false
-  decorate(buf, task)
+  if task.kind == "chain" then
+    decorate(buf, step_task(buf, task.steps[1]))
+  else
+    decorate(buf, task)
+  end
   vim.api.nvim_win_set_cursor(win, task.cursor)
   vim.api.nvim_win_call(win, function()
     vim.fn.winrestview({ topline = 1, leftcol = 0 })
@@ -91,6 +86,14 @@ end
 
 local function at_goal(a)
   local task = a.o.task
+  if task.kind == "chain" then
+    local st = task.steps[a.step]
+    if st.kind == "move" then
+      local c = vim.api.nvim_win_get_cursor(a.o.win)
+      return c[1] == st.row and c[2] == st.goal_col
+    end
+    return (vim.api.nvim_buf_get_lines(a.o.buf, st.row - 1, st.row, false)[1] or "") == st.goal_line
+  end
   if task.kind == "move" then
     local c = vim.api.nvim_win_get_cursor(a.o.win)
     return c[1] == task.goal[1] and c[2] == task.goal[2]
@@ -129,6 +132,7 @@ local function finish(solved)
     keys = a.keys,
     time_ms = M.clock() - a.start,
     hint = a.hint,
+    steps_done = a.o.task.kind == "chain" and (solved and #a.o.task.steps or a.step - 1) or nil,
     blocked = a.blocked,
   }
   vim.schedule(function()
@@ -149,6 +153,17 @@ local function check()
     return
   end
   if at_goal(a) then
+    local task = a.o.task
+    if task.kind == "chain" and a.step < #task.steps then
+      -- next step: highlight it, keep counting keys
+      a.step = a.step + 1
+      vim.bo[a.o.buf].modifiable = editable(task, a.step)
+      decorate(a.o.buf, step_task(a.o.buf, task.steps[a.step]))
+      if a.o.on_step then
+        a.o.on_step(a.step)
+      end
+      return
+    end
     finish(true)
   end
 end
@@ -165,19 +180,20 @@ local function habit_blocks(a, typed, now)
   end
   if not habit_set[h.keys][typed] then
     a.prev_typed = typed
+    a.run = nil -- any other key starts over: only presses in a row count
     return false
   end
   -- a press right after a count digit starts fresh: 3j is the good habit
   if a.prev_typed and a.prev_typed:match("^[1-9]$") then
-    a.runs[typed] = nil
+    a.run = nil
   end
   a.prev_typed = typed
-  local run = a.runs[typed]
-  if run and now - run.t0 < h.window_ms then
+  local run = a.run
+  if run and run.key == typed and now - run.t0 < h.window_ms then
     run.n = run.n + 1
   else
-    run = { t0 = now, n = 1 }
-    a.runs[typed] = run
+    run = { key = typed, t0 = now, n = 1 }
+    a.run = run
   end
   return run.n > h.grace
 end
@@ -206,10 +222,14 @@ local function on_key(_, typed)
     -- the character after f/t/r/…: record it, but it is not a command
     a.arg_next = false
     a.prev_typed = nil
+    a.run = nil
     a.count = a.count + 1
     a.keys[#a.keys + 1] = { k = keys.typed(typed), mode = "arg" }
     vim.schedule(check)
     return
+  end
+  if mode ~= "n" then
+    a.run = nil -- typed text breaks a run of presses too
   end
   if mode == "n" and (typed == "\t" or typed == "\27") then
     return -- hint key, or <Esc> that changes nothing: free
@@ -239,13 +259,32 @@ end
 function M.start(o)
   M.abort()
   M.load(o.buf, o.win, o.task)
-  local a = { o = o, keys = {}, count = 0, hint = false, blocked = 0, runs = {}, start = M.clock() }
+  local a = { o = o, keys = {}, count = 0, hint = false, blocked = 0, start = M.clock(), step = 1 }
   active = a
   vim.on_key(on_key, key_ns)
   vim.api.nvim_create_autocmd({ "CursorMoved", "TextChanged", "ModeChanged" }, {
     group = group,
     callback = function()
       vim.schedule(check)
+    end,
+  })
+  -- the marks always show what is left to do (decision 0016)
+  vim.api.nvim_create_autocmd({ "TextChanged", "TextChangedI" }, {
+    group = group,
+    buffer = o.buf,
+    callback = function()
+      if active ~= a or a.done then
+        return
+      end
+      local task = o.task
+      if task.kind == "chain" then
+        local st = task.steps[a.step]
+        if st.kind == "edit" then
+          decorate(o.buf, step_task(o.buf, st))
+        end
+      elseif task.kind == "edit" then
+        decorate(o.buf, { kind = "edit", lines = vim.api.nvim_buf_get_lines(o.buf, 0, -1, false), goal_lines = task.goal_lines })
+      end
     end,
   })
   a.timer = vim.uv.new_timer()

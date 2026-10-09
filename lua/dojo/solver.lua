@@ -5,6 +5,7 @@
 -- is modelled exactly (see docs/decisions/0003-solver-runs-real-neovim.md).
 local moves = require("dojo.moves")
 local text = require("dojo.text")
+local marks = require("dojo.marks")
 local keys = require("dojo.keys")
 local config = require("dojo.config")
 
@@ -81,8 +82,31 @@ local function with_scratch(fn)
   return res
 end
 
+-- the marks a player sees, drawn in the scratch buffer too: inline ghost
+-- text shifts the columns j and k aim for (dojo.marks)
+local mark_ns = vim.api.nvim_create_namespace("dojo.solver.marks")
+
+local function mark(buf, task, lines)
+  if task.kind == "edit" then
+    marks.edit(buf, mark_ns, lines, task.goal_lines)
+  else
+    vim.api.nvim_buf_clear_namespace(buf, mark_ns, 0, -1)
+  end
+end
+
 local function restore(st)
   vim.fn.winrestview({ lnum = st.row, col = st.col, curswant = st.cw, topline = 1, leftcol = 0 })
+end
+
+-- The column j and k aim for at the start: given (chains), or the cursor's
+-- screen column with the marks drawn, as Neovim sets it when the round loads.
+local function start_cw(buf, task)
+  if task.curswant then
+    return task.curswant
+  end
+  mark(buf, task, vim.api.nvim_buf_get_lines(buf, 0, -1, false))
+  vim.api.nvim_win_set_cursor(0, task.cursor)
+  return vim.fn.winsaveview().curswant
 end
 
 local function normal(k)
@@ -92,6 +116,33 @@ end
 -- Solve a task.
 -- task: { kind = "move"|"edit", lines, cursor = {row, col}, goal = {row, col} | goal_lines }
 -- learned: set of move families
+-- Does an edit leave every line but `row` alone? A charwise operator can
+-- reach into another line (cb from column 0 changes the word at the end of
+-- the line above). That is legal Vim but not what the game teaches, so the
+-- solver leaves such edits out; j/k and line edges are line-wise anyway.
+local function on_row(old, new, row)
+  local ol = vim.split(old, "\n", { plain = true })
+  local nl = vim.split(new, "\n", { plain = true })
+  if #ol ~= #nl then
+    return false
+  end
+  for i = 1, #ol do
+    if i ~= row and ol[i] ~= nl[i] then
+      return false
+    end
+  end
+  return true
+end
+
+local function charwise_operator(t)
+  return (t.fams.d or t.fams.c) and not t.rowlevel
+end
+
+-- the count a token repeats its move by: 4j -> 4, d2w -> 2, 3dd -> 3, w -> 1
+local function count_of(t)
+  return tonumber(t.keys:match("^(%d)") or t.keys:match("^[dc](%d)")) or 1
+end
+
 -- opts: { focus = { {fam, ...}, ... }, ban = function(token) -> bool, max_cost = n }
 -- returns { cost, keys, display, tokens, focus } or nil
 function M.solve(task, learned, opts)
@@ -140,7 +191,7 @@ function M.solve(task, learned, opts)
   end
 
   return with_scratch(function(buf)
-    local cur_text
+    local cur_text, marked_text
     local cache = {}
     local function info(t)
       local c = cache[t]
@@ -154,6 +205,11 @@ function M.solve(task, learned, opts)
       if cur_text ~= t then
         vim.api.nvim_buf_set_lines(buf, 0, -1, false, info(t).lines)
         cur_text = t
+        marked_text = nil -- replacing the lines moves the marks off their places
+      end
+      if marked_text ~= t or opts.fresh_marks then -- fresh_marks: tests only
+        mark(buf, task, info(t).lines)
+        marked_text = t
       end
     end
     local function buffer_text()
@@ -225,12 +281,17 @@ function M.solve(task, learned, opts)
       end
       return (is_edit and t or "") .. "\0" .. row .. ":" .. col .. ":" .. cw
     end
+    -- Among equally short solutions: the stage's move, then fewer commands,
+    -- then smaller counts (2kwd$ reads better than 09bd$), then by keys.
     local function better(a, b)
       if a.focus ~= b.focus then
         return a.focus
       end
       if a.ntok ~= b.ntok then
         return a.ntok < b.ntok
+      end
+      if a.nsum ~= b.nsum then
+        return a.nsum < b.nsum
       end
       return a.keys < b.keys
     end
@@ -275,6 +336,7 @@ function M.solve(task, learned, opts)
         cw = v.curswant,
         cost = n.cost + t.cost,
         ntok = n.ntok + 1,
+        nsum = n.nsum + count_of(t),
         keys = n.keys .. t.keys,
         focus = n.focus or moves.matches(t, focus),
         parent = n,
@@ -310,6 +372,9 @@ function M.solve(task, learned, opts)
       if typed:find("[\n`]") then
         return
       end
+      if charwise_operator(t) and not on_row(n.text, rest, n.row) then
+        return
+      end
       local full = { keys = t.keys .. typed .. "\27", cost = t.cost + #typed + 1, fams = t.fams, typed = typed }
       push({
         text = goal,
@@ -319,6 +384,7 @@ function M.solve(task, learned, opts)
         h = 0,
         cost = n.cost + full.cost,
         ntok = n.ntok + 1,
+        nsum = n.nsum + count_of(t),
         keys = n.keys .. full.keys,
         focus = n.focus or moves.matches(t, focus),
         parent = n,
@@ -376,7 +442,7 @@ function M.solve(task, learned, opts)
           then
             run(n, t.keys)
             local nt = buffer_text()
-            if nt ~= n.text and ok_text(nt) then
+            if nt ~= n.text and ok_text(nt) and not (charwise_operator(t) and not on_row(n.text, nt, n.row)) then
               push(child(n, t, nt, vim.fn.winsaveview()))
             end
           end
@@ -396,13 +462,15 @@ function M.solve(task, learned, opts)
       end
     end
 
+    load(start)
     local s0 = {
       text = start,
       row = task.cursor[1],
       col = task.cursor[2],
-      cw = task.cursor[2],
+      cw = start_cw(buf, task), -- chains: the column j/k remember
       cost = 0,
       ntok = 0,
+      nsum = 0,
       keys = "",
       focus = false,
     }
@@ -498,13 +566,33 @@ function M.alternatives(task, learned, best, opts)
   return out
 end
 
+-- Replay tokens from a task's start; returns { lines, cursor, curswant }
+-- afterwards. Chains use it to start each step where the intended path leaves
+-- off, including the column j and k remember (after $, the line end).
+function M.run(task, tokens)
+  return with_scratch(function(buf, win)
+    vim.api.nvim_buf_set_lines(buf, 0, -1, false, task.lines)
+    restore({ row = task.cursor[1], col = task.cursor[2], cw = start_cw(buf, task) })
+    for _, t in ipairs(tokens) do
+      mark(buf, task, vim.api.nvim_buf_get_lines(buf, 0, -1, false))
+      normal(t.keys)
+    end
+    return {
+      lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false),
+      cursor = vim.api.nvim_win_get_cursor(win),
+      curswant = vim.fn.winsaveview().curswant,
+    }
+  end)
+end
+
 -- Replay a solution token by token in the scratch buffer; true if it reaches
 -- the goal. Used by tests and as a safety check when generating rounds.
 function M.check(task, tokens)
   return with_scratch(function(buf, win)
     vim.api.nvim_buf_set_lines(buf, 0, -1, false, task.lines)
-    restore({ row = task.cursor[1], col = task.cursor[2], cw = task.cursor[2] })
+    restore({ row = task.cursor[1], col = task.cursor[2], cw = start_cw(buf, task) })
     for _, t in ipairs(tokens) do
+      mark(buf, task, vim.api.nvim_buf_get_lines(buf, 0, -1, false))
       normal(t.keys)
     end
     if task.kind == "edit" then

@@ -157,7 +157,7 @@ return {
     end,
   },
   {
-    "habit mode blocks the third press, not counted",
+    "habit mode blocks the fourth press in a row, not counted",
     function()
       local lines = {}
       for i = 1, 8 do
@@ -165,16 +165,33 @@ return {
       end
       local task = { kind = "move", lines = lines, cursor = { 1, 0 }, goal = { 6, 0 } }
       local blocked = 0
-      local r = run(task, { "j", "j", "j", "3j" }, {
+      local r = run(task, { "j", "j", "j", "j", "2j" }, {
         habit = true,
         on_blocked = function()
           blocked = blocked + 1
         end,
       })
-      H.ok(r and r.solved, "2 j + 3j reach line 6")
-      H.eq(r.count, 4)
+      H.ok(r and r.solved, "3 j + 2j reach line 6")
+      H.eq(r.count, 5)
       H.eq(r.blocked, 1)
       H.eq(blocked, 1)
+      -- three cells with l is the natural move: never blocked
+      local r2 = run({ kind = "move", lines = { "abcdef" }, cursor = { 1, 0 }, goal = { 1, 3 } }, { "l", "l", "l" }, { habit = true })
+      H.ok(r2 and r2.solved)
+      H.eq(r2.blocked, 0)
+    end,
+  },
+  {
+    "habit mode counts presses in a row only",
+    function()
+      local lines = {}
+      for i = 1, 8 do
+        lines[i] = "line number " .. i
+      end
+      local task = { kind = "move", lines = lines, cursor = { 1, 0 }, goal = { 4, 1 } }
+      local r = run(task, { "j", "l", "j", "j" }, { habit = true })
+      H.ok(r and r.solved, "j l j j reaches line 4")
+      H.eq(r.blocked, 0)
     end,
   },
   {
@@ -219,7 +236,84 @@ return {
   {
     "config is untouched by rounds",
     function()
-      H.eq(config.get().habit.grace, 2)
+      H.eq(config.get().habit.grace, 3)
+    end,
+  },
+  {
+    "a chain counts steps in order, edits included",
+    function()
+      local steps = {}
+      local task = {
+        kind = "chain",
+        lines = { "alpha beta gamma", "one twxo three" },
+        cursor = { 1, 0 },
+        steps = {
+          { kind = "move", row = 2, goal_col = 6, line = "one twxo three" },
+          { kind = "move", row = 1, goal_col = 6, line = "alpha beta gamma" },
+          { kind = "edit", row = 2, line = "one twxo three", goal_line = "one two three" },
+        },
+      }
+      -- w lands on step 2's target first; it only counts once step 1 is done
+      local r, buf = run(task, { "w", "j", "k", "j", "x" }, {
+        on_step = function(i)
+          steps[#steps + 1] = i
+        end,
+      })
+      H.ok(r and r.solved, "chain should be solved")
+      H.eq(r.count, 5)
+      H.eq(r.steps_done, 3)
+      H.eq(steps, { 2, 3 })
+      H.eq(vim.api.nvim_buf_get_lines(buf, 0, -1, false), { "alpha beta gamma", "one two three" })
+    end,
+  },
+  {
+    "in a chain, the text can only change during edit steps",
+    function()
+      local buf, win = setup_window()
+      round.start({
+        buf = buf,
+        win = win,
+        task = {
+          kind = "chain",
+          lines = { "alpha beta", "one twxo" },
+          cursor = { 1, 0 },
+          steps = {
+            { kind = "move", row = 1, goal_col = 6, line = "alpha beta" },
+            { kind = "edit", row = 2, line = "one twxo", goal_line = "one two" },
+          },
+        },
+        on_done = function() end,
+      })
+      H.eq(vim.bo[buf].modifiable, false, "move step")
+      H.type("x")
+      H.eq(vim.api.nvim_buf_get_lines(buf, 0, 1, false)[1], "alpha beta")
+      H.type("w")
+      H.settle(30)
+      H.eq(vim.bo[buf].modifiable, true, "edit step")
+      round.abort()
+    end,
+  },
+  {
+    "a chain step starts with the column j and k remember, as in play",
+    function()
+      local solver = require("dojo.solver")
+      local compose = require("dojo.compose")
+      local learned = H.learned({ "hjkl", "line" })
+      local lines = { "short", "a much longer line here" }
+      local steps = {
+        { kind = "move", row = 1, goal_col = 4, line = lines[1] },
+        { kind = "move", row = 2, goal_col = 22, line = lines[2] },
+      }
+      local sub1 = compose.step_task(steps[1], lines, { 1, 0 })
+      local sol1 = solver.solve(sub1, learned)
+      H.eq(sol1.keys, "$")
+      local state = solver.run(sub1, sol1.tokens)
+      local sol2 = solver.solve(compose.step_task(steps[2], state.lines, state.cursor, state.curswant), learned)
+      H.eq(sol2.keys, "j", "after $, j keeps to the line end")
+      -- and the round runner agrees
+      local r = run({ kind = "chain", lines = lines, cursor = { 1, 0 }, steps = steps }, { "$", "j" })
+      H.ok(r and r.solved, "chain solved with $ then j")
+      H.eq(r.count, 2)
     end,
   },
 }

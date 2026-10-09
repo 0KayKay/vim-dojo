@@ -55,7 +55,7 @@ SPEC.md                 behavior (source of truth)
 AGENTS.md               this file; CLAUDE.md points here
 plugin/dojo.lua         :Dojo command
 lua/dojo/               the game (see SPEC.md §9 for each module)
-lua/dojo/stages/        one file per stage
+lua/dojo/stages/        one file per stage, named by its stable key; boss.lua
 tests/                  headless tests, runner in tests/run.lua
 docker/                 Dockerfile and the container's init.lua
 compose.yaml            dojo / dev / test services
@@ -67,14 +67,18 @@ docs/playtests.md       playtest notes
 
 ## Adding a stage
 
-1. Add the stage to the curriculum table in `SPEC.md` §7 (keys, round kind,
-   what rounds look like).
-2. Create `lua/dojo/stages/s<world>_<n>.lua` (stage 2.4 is `s2_4.lua`)
-   following the contract in SPEC.md §9. If it
-   teaches a new kind of key, add the move family in `lua/dojo/moves.lua`.
+1. Add the stage to the curriculum tables in `SPEC.md` §7 (key, keys, basic
+   and combined rounds).
+2. Create `lua/dojo/stages/<key>.lua` following the contract in SPEC.md §9.
+   The key is permanent (saved progress uses it); the display id comes from the
+   order. If the stage teaches a new kind of key, add the move family in
+   `lua/dojo/moves.lua`. Give the explainer a `combos` list, and add a
+   `combined` generator if the generic combine step (cursor moved away) is not
+   enough.
 3. List it in `lua/dojo/curriculum.lua`.
-4. `make test`: the stage test generates 200 rounds per mode and replays every
-   solution. Fix the generator until it passes, then play it once yourself
+4. `make test`: the stage test generates 200 rounds per round kind and replays
+   every solution, checking the stage's move is used and combined rounds
+   combine. Fix the generator until it passes, then play it once yourself
    (`make dev`). `DOJO_SEEDS=40 make test` gives a faster first pass.
 
 ## Definition of done

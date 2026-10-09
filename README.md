@@ -27,12 +27,18 @@ assumes stock Neovim.
 
 ## How it plays
 
-- **Explainer:** what the new move does, in Vim key notation.
-- **Drill:** 5 untimed rounds that need the new move. `<Tab>` shows a hint.
-- **Challenge:** 8 timed rounds mixing all moves so far. 1 star unlocks the next
-  stage; 3 stars means you solved nearly everything at par.
-- **Habit mode** (optional, `H` in the menu): blocks a motion key pressed three
-  times in a row, once you have learned counts.
+- **Explainer:** what the new move does and what it combines with, in Vim key
+  notation.
+- **Drill:** 6 untimed rounds, first the move alone, then combined with moves
+  you know. `<Tab>` shows a hint.
+- **Challenge:** 8 timed rounds; every one needs the new move, most combine it.
+  1 star unlocks the next stage.
+- **Boss:** at the end of each world, mixed rounds and chains of 2–3 steps. It
+  shows your weakest move. Beat a boss early to skip ahead.
+- **Habit mode** (on by default, `H` in the menu): in timed rounds, blocks a
+  motion key pressed four times in a row once you have learned counts.
+- **Look back:** in any summary, `<CR>` on a round shows how it started next to
+  your keys and the intended solution; `p` plays it again without a clock.
 
 ## Develop
 

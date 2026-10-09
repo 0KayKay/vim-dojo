@@ -1,7 +1,7 @@
 local words = require("dojo.words")
 
 return {
-  id = "2.3",
+  key = "line_edges",
   title = "0 ^ $",
   name = "Line edges",
   kind = "move",
@@ -19,7 +19,11 @@ return {
       keys = "^",
       after = { "    [i]f the wind is calm" },
     },
-    tip = "On indented lines 0 and ^ differ: ^ skips the indentation.",
+    combos = {
+      { "3j$", "three lines down, then the end" },
+      { "k^", "up a line, then its first non-blank" },
+    },
+    tip = "On indented lines 0 and ^ differ: ^ skips the indentation. ^ looks like it points at the first word.",
   },
   generate = function(rng, _)
     local lines = words.lines(rng, 3, 6, 8)
