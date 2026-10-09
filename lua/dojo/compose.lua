@@ -31,8 +31,11 @@ end
 
 -- The generic combine step: put the task in a taller buffer and start the
 -- cursor on another line or further along the same line, so the task's move
--- has to follow another one (3jA…, 2j$, 3lx).
-function M.combine(task, rng, ctx)
+-- has to follow another one (3jA…, 2j$, 3lx). opts.vertical: start a few
+-- lines away, about straight above or below (2jdt,), for rounds that already
+-- combine two moves on their line.
+function M.combine(task, rng, ctx, opts)
+  opts = opts or {}
   local t = vim.deepcopy(task)
   local code = has_punct(task.lines)
   local above, below = rng:int(0, 3), rng:int(0, 3)
@@ -78,6 +81,15 @@ function M.combine(task, rng, ctx)
     if not r then
       r, col = trow, U.clamp(tcol + 2, 0, math.max(0, #t.lines[trow] - 1))
     end
+  elseif opts.vertical then
+    local cands = {}
+    for rr = 1, #t.lines do
+      if rr ~= trow and math.abs(rr - trow) <= 3 then
+        cands[#cands + 1] = rr
+      end
+    end
+    r = rng:pick(cands)
+    col = U.clamp(tcol + rng:int(-2, 2), 0, math.max(0, #t.lines[r] - 1))
   else
     -- how far sideways: a few cells until word motions or f/t are known
     local spread = (ctx.learned.wb or ctx.learned.f) and 10 or 3

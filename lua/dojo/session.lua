@@ -141,7 +141,7 @@ local function stage_task(st, variant, rng, gctx)
   if t then
     -- half the time, also start somewhere else: 2jdt, rather than dt, alone
     if #t.lines == 1 and rng:chance(0.5) then
-      return compose.combine(t, rng, gctx)
+      return compose.combine(t, rng, gctx, { vertical = true })
     end
     return t
   end
