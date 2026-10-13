@@ -10,7 +10,7 @@ M.defaults = {
   boss_chains = { 2, 2, 3, 3 }, -- steps per chain round, played last (decision 0009)
   time_base_s = 5, -- time limit = base + per_key * par (challenges and bosses)
   time_per_key_s = 0.8,
-  time_per_step_s = 3, -- chains: reading time for every step after the first (decision 0015)
+  time_per_step_s = 1, -- chains: reading time for every step after the first (decisions 0015, 0018)
   warn_s = 2, -- warning color in the last seconds
   star2_slack = 2, -- 2 stars when keys <= par + slack
   pass_ratio = 0.75,
