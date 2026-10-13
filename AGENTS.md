@@ -9,6 +9,9 @@ humans alike. Read this first, then follow it.
 2. [docs/decisions/](docs/decisions/): why things are the way they are.
 3. [docs/references.md](docs/references.md): who inspired what (credit).
 4. [docs/playtests.md](docs/playtests.md): what players noticed and what changed.
+5. [docs/requirements/](docs/requirements/): proposals for coming versions.
+   A bigger iteration starts there and is reviewed by the owner before any of
+   it moves into `SPEC.md`.
 
 ## Rules of thumb
 
@@ -60,6 +63,7 @@ tests/                  headless tests, runner in tests/run.lua
 docker/                 Dockerfile and the container's init.lua
 compose.yaml            dojo / dev / test services
 docs/decisions/         decision records
+docs/requirements/      proposals for coming versions, reviewed before the spec
 docs/references.md      credits
 docs/playtests.md       playtest notes
 .github/workflows/      CI
