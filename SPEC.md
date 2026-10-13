@@ -1,6 +1,6 @@
 # Vim Dojo — Specification
 
-**Status:** prototype spec, version 0.6 (2026-10-09). This file is the source of
+**Status:** prototype spec, version 0.6 (2026-10-13). This file is the source of
 truth for how the game behaves. How to change it: see [AGENTS.md](AGENTS.md).
 Why things are the way they are: [docs/decisions/](docs/decisions/).
 
@@ -159,9 +159,9 @@ every character including `<CR>`. Not counted: `<Esc>` pressed while already in
 Normal mode, the game's control keys, and keys blocked by habit mode.
 
 **Timer.** Challenges and bosses only. The limit is 5 s plus 0.8 s per key of
-par, plus 3 s for every chain step after the first, to read the new target:
+par, plus 1 s for every chain step after the first, to read the new target:
 `3w` gets 6.6 s, `ct)foo<Esc>` gets 10.6 s, a 3-step chain with a total par of
-14 gets 22.2 s (docs/decisions/0015). The countdown in the header turns to a
+14 gets 18.2 s (docs/decisions/0015 and 0018). The countdown in the header turns to a
 warning color in the last 2 s, and each challenge or boss opens with a 3-2-1
 countdown.
 
@@ -598,7 +598,7 @@ through `require("dojo").setup()`, because playtesting will move most of them.
 | Drill rounds | 3 basics + 3 combined |
 | Challenge rounds | 8, all with the new move, 5 of them combined |
 | Boss rounds | 10: 6 mixed + 4 chains of 2, 2, 3 and 3 steps |
-| Time limit per timed round | 5 s + 0.8 s per par key, + 3 s per chain step after the first |
+| Time limit per timed round | 5 s + 0.8 s per par key, + 1 s per chain step after the first |
 | Warning color | last 2 s |
 | 2-star round | up to par + 2 keys |
 | Pass (1 star, unlocks the next entry) | 75 % of rounds solved |
@@ -680,4 +680,4 @@ the boss concept report already identifies.
 | 0.3 | 2026-10-07 | From building and the first playtest: count limits for `h l x`, solver pruning, `:q` and menu focus behavior, stage file names |
 | 0.4 | 2026-10-07 | From an independent code review: full per-round feedback, mouse ignored, leaving the tab stops a round, two-step rounds need two moves, test wording matches what is tested |
 | 0.5 | 2026-10-08 | From the owner's playtest (docs/playtests/2026-10-08-owner.md): every challenge round uses the new move and most combine it; drills get a combined part; bosses with chains, skip ahead and a concept report; counts move to 1.2; `dd` becomes a whole-lines stage after `c`; 4.3 folded into 4.1/4.2; tighter clock; glanceable distances; habit mode on by default in challenges (presses in a row); stable stage keys with progress migration. From building and an independent review: round quality rules (decision 0013: clunky pars, chain step limit, smaller counts on ties, operators stay on their line), chains keep the remembered column between steps, boss mixed rounds rotate through the world's stages |
-| 0.6 | 2026-10-09 | From the owner's second playtest (docs/playtests/2026-10-09-owner.md) and its round log: World 1 without counts, counts open World 2, `h`/`l` never take counts, natural distances (World 1 at most 3 presses), habit mode blocks the 4th press; clock 5 s + 0.8 s/key + 3 s per extra chain step; edit marks in place, word-aligned and live; `<CR>` opens the stage page; rounds can be reviewed and replayed from a summary; undo tip |
+| 0.6 | 2026-10-09 | From the owner's second playtest (docs/playtests/2026-10-09-owner.md) and its round log: World 1 without counts, counts open World 2, `h`/`l` never take counts, natural distances (World 1 at most 3 presses), habit mode blocks the 4th press; clock 5 s + 0.8 s/key + 1 s per extra chain step (3 s at first, cut after the third playtest, docs/playtests/2026-10-13-owner.md); edit marks in place, word-aligned and live; `<CR>` opens the stage page; rounds can be reviewed and replayed from a summary; undo tip |
