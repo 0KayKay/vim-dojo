@@ -2,7 +2,7 @@ local words = require("dojo.words")
 local U = require("dojo.stages.util")
 
 return {
-  id = "1.4",
+  key = "append",
   title = "A I",
   name = "Add at line ends",
   kind = "edit",
@@ -19,7 +19,11 @@ return {
       keys = "A␣fox<Esc>",
       after = { "the quick brown fo[x]" },
     },
-    tip = "A and I work from anywhere on the line: no need to move first.",
+    combos = {
+      { "jjA…", "on another line: go there, then append" },
+      { "kI…", "up a line, then insert at its start" },
+    },
+    tip = "A and I work from anywhere on the line: only the line matters, not the column.",
   },
   generate = function(rng, _)
     local ws = words.pick(rng, rng:int(5, 7))
@@ -31,12 +35,14 @@ return {
       table.remove(short, 1) -- first word missing: I
     end
     local line = table.concat(short, " ")
+    -- start mid-line, away from both ends, so A and I are the point
+    local col = rng:int(math.min(4, #line - 1), math.max(math.min(4, #line - 1), #line - 5))
     return {
       kind = "edit",
       lines = { line },
-      cursor = { 1, rng:int(0, #line - 1) },
+      cursor = { 1, col },
       goal_lines = { goal },
-      prompt = "Add the missing word shown in the goal line",
+      prompt = "Add the word shown in green",
     }
   end,
 }

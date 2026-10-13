@@ -103,8 +103,35 @@ return {
     "dd deletes a line",
     function()
       local t = edit({ "a b", "c d", "e f" }, { 2, 0 }, { "a b", "e f" })
-      local r = solver.solve(t, H.learned({ "hjkl", "dd" }))
+      local r = solver.solve(t, H.learned({ "hjkl", "lines" }))
       H.eq(r.keys, "dd")
+    end,
+  },
+  {
+    "smaller counts break ties: 2k…d$, not 09bd$ across lines",
+    function()
+      local t = edit(
+        { "else gain key poem mail trip", "soft rope pink sort meal lady cash", "club girl food lock" },
+        { 3, 18 },
+        { "else gain key poem ", "soft rope pink sort meal lady cash", "club girl food lock" }
+      )
+      local r = solver.solve(t, H.learned({ "hjkl", "count", "wb", "e", "line", "d" }), { focus = { { "d" } } })
+      H.eq(r.cost, 5)
+      H.eq(r.keys:sub(1, 2), "2k", r.keys)
+    end,
+  },
+  {
+    "operators stay on the cursor's line: no cb from column 0 into the line above",
+    function()
+      local t = edit(
+        { "lens duck inch water apple box", "call(baby.sea, army);" },
+        { 2, 0 },
+        { "lens duck inch water apple mark", "call(baby.sea, army);" }
+      )
+      local r = solver.solve(t, H.learned({ "hjkl", "count", "wb", "e", "line", "c" }))
+      H.ok(r, "solvable")
+      H.ok(not r.keys:find("^0?cb"), "crosses lines: " .. r.keys)
+      H.eq(r.keys, "bc$mark\27", "moving back a word across lines is fine")
     end,
   },
   {

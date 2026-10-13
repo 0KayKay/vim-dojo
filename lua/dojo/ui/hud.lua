@@ -14,9 +14,21 @@ local function draw(s, r, elapsed)
   local width = layout.hud_width()
   local cfg = config.get()
 
-  local title = string.format(" %s %s · %s", s.stage.id, s.stage.title, s.mode == "drill" and "Drill" or "Challenge")
+  local part = ({ drill = "Drill", challenge = "Challenge", boss = "World " .. s.stage.world, practice = "Practice" })[s.mode]
+  if r and s.mode == "drill" then
+    part = r.variant == "combined" and "Drill · combined" or "Drill · basics"
+  elseif r and s.mode == "boss" then
+    part = r.variant == "chain" and "chain" or "mixed"
+  end
+  local title = string.format(" %s %s · %s", s.stage.id, s.stage.title, part)
   local right, time_text, time_hl = "", "", "DojoDim"
+  local prompt = r and r.task.prompt or ""
   if r then
+    local steps = r.task.steps
+    if steps then
+      local st = steps[r.step or 1]
+      prompt = string.format("Step %d/%d: %s", r.step or 1, #steps, st.prompt)
+    end
     right = string.format("round %d/%d   par %d   ", r.index, #s.plan, r.sol.cost)
     if r.limit_ms then
       local left = math.max(0, (r.limit_ms - (elapsed or 0)) / 1000)
@@ -31,7 +43,7 @@ local function draw(s, r, elapsed)
 
   local rows = {
     { { title, "DojoTitle" }, { pad }, { right }, { time_text, time_hl } },
-    { { " " .. (r and r.task.prompt or "") } },
+    { { " " .. prompt } },
     { { " Learned: " .. moves.learned_label(s.learned), "DojoDim" } },
     s.last or { { "" } },
   }
@@ -40,6 +52,12 @@ end
 
 function M.round(s, r)
   draw(s, r, 0)
+end
+
+-- any rows, for screens that borrow the header (the round review)
+function M.custom(rows)
+  layout.open_hud()
+  render.draw(layout.buf("hud"), rows)
 end
 
 function M.tick(s, r, elapsed)
@@ -52,17 +70,38 @@ function M.countdown(s, n)
 end
 
 function M.hint(s, r)
-  local msg = s.mode == "challenge" and "   (this round can now earn 1 star at most)" or ""
-  s.last = { { " Hint: ", "DojoDim" }, { r.sol.display, "DojoKey" }, { msg, "DojoDim" } }
+  local msg = s.mode ~= "drill" and "   (this round can now earn 1 star at most)" or ""
+  local display = r.sol.display
+  if r.task.steps then
+    display = r.task.steps[r.step or 1].sol.display -- this step only
+  end
+  s.last = { { " Hint: ", "DojoDim" }, { display, "DojoKey" }, { msg, "DojoDim" } }
   draw(s, r, r.elapsed)
 end
 
+-- a better move than pressing key again: a count, or for h and l (which
+-- take no counts) the moves made for longer trips (SPEC §5 Habit mode).
+-- Returns the advice and an example in key notation (or nil).
+local function better(key, learned)
+  if key ~= "h" and key ~= "l" then
+    return " blocked. Try a count, like ", "4" .. key
+  end
+  local fwd = key == "l"
+  if learned.f then
+    return " blocked. Try a word motion or f/t, like ", fwd and "w e f" or "b F"
+  elseif learned.wb then
+    return " blocked. Try a word motion, like ", fwd and "w e" or "b"
+  end
+  return " blocked: three presses at most.", nil
+end
+
 function M.blocked(s, r, key)
+  local advice, example = better(key, s.learned)
   s.last = {
     { " Habit mode: ", "DojoWarn" },
-    { key .. key .. key, "DojoKey" },
-    { " blocked. Try a count, like ", "DojoDim" },
-    { "3" .. key, "DojoKey" },
+    { string.rep(key, config.get().habit.grace + 1), "DojoKey" },
+    { advice, "DojoDim" },
+    { example or "", "DojoKey" },
   }
   draw(s, r, r.elapsed)
 end

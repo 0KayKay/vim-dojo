@@ -63,21 +63,102 @@ return {
     "progress: unlock, best result, save and load",
     function()
       progress.wipe()
-      H.ok(progress.unlocked("1.1"))
-      H.ok(not progress.unlocked("1.2"))
-      progress.record_drill("1.1")
-      H.ok(progress.record_challenge("1.1", { stars = 1, score = 1.5 }))
-      H.ok(progress.unlocked("1.2"))
-      H.ok(not progress.record_challenge("1.1", { stars = 1, score = 1.2 }), "worse is not a new best")
-      H.ok(progress.record_challenge("1.1", { stars = 2, score = 2.1 }))
-      progress.setting("habit", true)
+      H.ok(progress.unlocked("hjkl"))
+      H.ok(not progress.unlocked("x"))
+      progress.record_drill("hjkl")
+      H.ok(progress.record_challenge("hjkl", { stars = 1, score = 1.5 }))
+      H.ok(progress.unlocked("x"))
+      H.ok(not progress.record_challenge("hjkl", { stars = 1, score = 1.2 }), "worse is not a new best")
+      H.ok(progress.record_challenge("hjkl", { stars = 2, score = 2.1 }))
+      progress.setting("habit", false)
       progress.reset() -- reload from disk
-      local s = progress.stage("1.1")
+      local s = progress.stage("hjkl")
       H.eq(s.best_stars, 2)
       H.eq(s.attempts, 3)
       H.ok(s.drill_done)
-      H.eq(progress.setting("habit"), true)
+      H.eq(progress.setting("habit"), false)
       H.eq((progress.total_stars()), 2)
+    end,
+  },
+  {
+    "progress: habit mode is on for new players",
+    function()
+      progress.wipe()
+      H.eq(progress.setting("habit"), true)
+    end,
+  },
+  {
+    "progress: bosses open with their world and let you skip ahead",
+    function()
+      progress.wipe()
+      H.ok(progress.unlocked("boss_1"), "the first boss is open from the start")
+      H.ok(not progress.unlocked("boss_2"))
+      H.ok(not progress.unlocked("counts"))
+      progress.record_challenge("boss_1", { stars = 1, score = 1.5 })
+      H.ok(progress.unlocked("counts"), "the next world opens")
+      H.ok(progress.unlocked("boss_2"))
+      H.ok(progress.unlocked("append"), "the rest of the beaten world opens too")
+      H.ok(not progress.unlocked("word"))
+    end,
+  },
+  {
+    "progress: version 1 files move to stage keys",
+    function()
+      progress.wipe()
+      local dir = progress.dir()
+      vim.fn.mkdir(dir, "p")
+      local f = assert(io.open(dir .. "/progress.json", "w"))
+      f:write(vim.json.encode({
+        stages = {
+          ["1.2"] = { explainer_seen = true, drill_done = true, best_stars = 3, best_score = 3, attempts = 2 },
+          ["2.4"] = { explainer_seen = true, drill_done = true, best_stars = 2, best_score = 2.4, attempts = 1 },
+          ["3.2"] = { explainer_seen = true, drill_done = false, best_stars = 0, best_score = 0, attempts = 0 },
+        },
+        settings = { habit = false },
+      }))
+      f:close()
+      progress.reset()
+      H.eq(progress.stage("x").best_stars, 3, "1.2 was x")
+      H.eq(progress.stage("counts").best_stars, 2, "2.4 was counts")
+      H.ok(progress.stage("lines").explainer_seen, "3.2 was dd")
+      H.eq(progress.setting("habit"), true, "habit mode is the new default")
+      H.ok(progress.unlocked("insert"), "after a passed stage")
+      H.ok(progress.unlocked("delete"), "v1 3.1 was open after 2.4, though 2.B now comes first")
+      H.ok(progress.unlocked("word"), "counts now sits right before w b, with a star")
+      H.ok(not progress.unlocked("word_end"), "v1 2.2 was locked too")
+      progress.reset() -- saved as version 2
+      local raw = vim.json.decode(table.concat(vim.fn.readfile(dir .. "/progress.json"), "\n"))
+      H.eq(raw.version, 2)
+      H.eq(raw.stages.x.best_stars, 3)
+      H.eq(raw.stages["1.2"], nil)
+    end,
+  },
+  {
+    "concept report: averages per move and the weakest one",
+    function()
+      local function r(stars, ...)
+        local c = {}
+        for _, f in ipairs({ ... }) do
+          c[f] = true
+        end
+        return { stars = stars, solved = stars > 0, concepts = c }
+      end
+      local list, weakest = score.concept_report({
+        r(3, "wb", "count"),
+        r(3, "wb", "line"),
+        r(1, "line", "e"),
+        r(2, "e", "count"),
+        r(3, "hjkl"),
+      })
+      local names = {}
+      for _, st in ipairs(list) do
+        names[#names + 1] = st.fam
+      end
+      H.eq(names, { "wb", "count", "line", "e" }, "best first, one-off moves left out")
+      H.eq(weakest.fam, "e")
+      H.eq(weakest.avg, 1.5)
+      local _, none = score.concept_report({ r(3, "wb"), r(3, "wb") })
+      H.eq(none, nil, "nothing to sharpen when every round was at par")
     end,
   },
 }

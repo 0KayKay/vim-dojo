@@ -83,4 +83,87 @@ function M.regions(lines, goal_lines)
     { srow = g1r, scol = g1c, erow = g2r, ecol = g2c, empty = (#b - s) <= p }
 end
 
+local function blank(c)
+  return c == "" or c == " " or c == "\n"
+end
+
+local function wordchar(c)
+  return c ~= "" and c:match("[%w_]") ~= nil
+end
+
+-- Kept prefix/suffix lengths as a person would mark the change (decision
+-- 0016). A pure insertion or deletion can sit anywhere along a run of
+-- repeated text with the same result; it is slid to a word boundary when
+-- there is one ("tent " before "test", not "nt te"), preferring a span that
+-- starts with a letter. Without one, it stays put, so a stray letter inside a
+-- word stays marked as that letter. A replacement is widened to whole words.
+function M.aligned(a, b)
+  local p, s = M.kept(a, b)
+  local da, db = #a - s - p, #b - s - p
+  if da > 0 and db > 0 then
+    while p > 0 and wordchar(a:sub(p, p)) and (wordchar(a:sub(p + 1, p + 1)) or wordchar(b:sub(p + 1, p + 1))) do
+      p = p - 1
+    end
+    while s > 0 do
+      local after = a:sub(#a - s + 1, #a - s + 1)
+      local last_a, last_b = a:sub(#a - s, #a - s), b:sub(#b - s, #b - s)
+      if wordchar(after) and (wordchar(last_a) or wordchar(last_b)) then
+        s = s - 1
+      else
+        break
+      end
+    end
+    return p, s
+  end
+  if da == 0 and db == 0 then
+    return p, s
+  end
+  -- T: the text without the span; X: the span, inserted at p
+  local T, X = (da == 0) and a or b, (da == 0) and b:sub(p + 1, p + db) or a:sub(p + 1, p + da)
+  local function aligned_at(q, x)
+    local left = q == 0 or blank(T:sub(q, q)) or blank(x:sub(1, 1))
+    local right = q == #T or blank(T:sub(q + 1, q + 1)) or blank(x:sub(-1))
+    return left and right
+  end
+  local cands = { { p, X } }
+  local q, x = p, X
+  while q > 0 and T:sub(q, q) == x:sub(-1) do -- slide left
+    x = T:sub(q, q) .. x:sub(1, -2)
+    q = q - 1
+    cands[#cands + 1] = { q, x }
+  end
+  q, x = p, X
+  while q < #T and T:sub(q + 1, q + 1) == x:sub(1, 1) do -- slide right
+    x = x:sub(2) .. T:sub(q + 1, q + 1)
+    q = q + 1
+    cands[#cands + 1] = { q, x }
+  end
+  local best
+  for _, c in ipairs(cands) do
+    if aligned_at(c[1], c[2]) then
+      if not blank(c[2]:sub(1, 1)) then
+        best = c
+        break
+      end
+      best = best or c
+    end
+  end
+  best = best or cands[1]
+  return best[1], #T - best[1]
+end
+
+-- Like regions(), with the span aligned to words (for the marks a player sees).
+function M.aligned_regions(lines, goal_lines)
+  local a, b = M.join(lines), M.join(goal_lines)
+  local p, s = M.aligned(a, b)
+  local sa, sb = M.line_starts(a), M.line_starts(b)
+  local r1, c1 = M.pos(sa, p)
+  local r2, c2 = M.pos(sa, #a - s)
+  local g1r, g1c = M.pos(sb, p)
+  local g2r, g2c = M.pos(sb, #b - s)
+  return { srow = r1, scol = c1, erow = r2, ecol = c2, empty = (#a - s) <= p },
+    { srow = g1r, scol = g1c, erow = g2r, ecol = g2c, empty = (#b - s) <= p },
+    b:sub(p + 1, #b - s)
+end
+
 return M

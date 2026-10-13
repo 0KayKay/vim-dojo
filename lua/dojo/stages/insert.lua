@@ -2,7 +2,7 @@ local words = require("dojo.words")
 local U = require("dojo.stages.util")
 
 return {
-  id = "1.3",
+  key = "insert",
   title = "i a",
   name = "Insert text",
   kind = "edit",
@@ -20,9 +20,13 @@ return {
       keys = "iquick␣<Esc>",
       after = { "the quick[ ]brown fox" },
     },
-    tip = "The goal line under the text shows what's missing. Type it, then <Esc>.",
+    combos = {
+      { "lli…", "move a little first, then insert" },
+      { "ja…", "from the line above: go down, then append" },
+    },
+    tip = "The text to type is shown in place, in green. Type it, then <Esc>. i or a: pick the one that needs no extra move; a saves the l in li.",
   },
-  generate = function(rng, ctx)
+  generate = function(rng, _)
     local ws = words.pick(rng, rng:int(5, 7), { min_len = 3 })
     local goal = table.concat(ws, " ")
     local line, col
@@ -62,13 +66,12 @@ return {
         col = base + p - 2 -- a on the letter before the gap
       end
     end
-    col = U.maybe_wander(rng, ctx, col, line, 0.3)
     return {
       kind = "edit",
       lines = { line },
       cursor = { 1, col },
       goal_lines = { goal },
-      prompt = "Type the missing text shown in the goal line",
+      prompt = "Type the text shown in green",
     }
   end,
 }

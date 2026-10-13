@@ -3,29 +3,31 @@ local U = require("dojo.stages.util")
 
 local JUNK = { "q", "z", "x", "j", "k", "v" }
 
--- A line with a run of stray letters inside one word.
+-- A line with 1 or 2 stray letters stuck to the start or end of a word, where
+-- a person would pluck them out (decision 0014). Returns the line, the goal
+-- and the column of the first stray letter.
 local function stray(rng, nmin, nmax)
   local ws = words.pick(rng, rng:int(5, 7))
   local wi = rng:int(1, #ws)
   local w = ws[wi]
-  local pos = rng:int(1, #w) -- stray letters go after this many letters
-  local prev, nxt = w:sub(pos, pos), w:sub(pos + 1, pos + 1)
+  local at_end = rng:chance(0.6)
+  local edge = at_end and w:sub(-1) or w:sub(1, 1)
   local junk = {}
   for i = 1, rng:int(nmin, nmax) do
     local c
     repeat
       c = rng:pick(JUNK)
-    until c ~= prev and c ~= nxt and c ~= junk[i - 1]
+    until c ~= edge and c ~= junk[i - 1]
     junk[i] = c
   end
   local bad = U.copy(ws)
-  bad[wi] = w:sub(1, pos) .. table.concat(junk) .. w:sub(pos + 1)
-  local col = U.start_of(bad, wi) + pos
+  bad[wi] = at_end and (w .. table.concat(junk)) or (table.concat(junk) .. w)
+  local col = U.start_of(bad, wi) + (at_end and #w or 0)
   return table.concat(bad, " "), table.concat(ws, " "), col
 end
 
 return {
-  id = "1.2",
+  key = "x",
   title = "x",
   name = "Delete characters",
   kind = "edit",
@@ -39,21 +41,24 @@ return {
       { "u", "undo the last change (costs a key, like any key)" },
     },
     example = {
-      before = { "the bro[q]wn fox" },
+      before = { "the brown[q] fox" },
       keys = "x",
-      after = { "the bro[w]n fox" },
+      after = { "the brow[n] fox" },
     },
-    tip = "Stray letters are highlighted. Delete them all and the round ends.",
+    combos = {
+      { "jlx", "go there first, then delete" },
+      { "xx", "two stray letters in a row" },
+    },
+    tip = "Stray letters are struck through. Delete them all and the round ends. A slip? u undoes it.",
   },
-  generate = function(rng, ctx)
-    local line, goal, col = stray(rng, 1, 3)
-    col = U.maybe_wander(rng, ctx, col, line)
+  generate = function(rng, _)
+    local line, goal, col = stray(rng, 1, 2)
     return {
       kind = "edit",
       lines = { line },
       cursor = { 1, col },
       goal_lines = { goal },
-      prompt = "Delete the highlighted letters",
+      prompt = "Delete the struck-through letters",
     }
   end,
 }

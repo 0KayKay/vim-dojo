@@ -36,7 +36,8 @@ function M.buf(name)
   return b
 end
 
-local function window_options(win, play)
+-- status: the key help for this screen, shown in the window's status line
+local function window_options(win, play, status)
   wset(win, "number", play)
   wset(win, "relativenumber", play)
   wset(win, "cursorline", not play)
@@ -48,7 +49,10 @@ local function window_options(win, play)
   wset(win, "spell", false)
   wset(win, "colorcolumn", "")
   wset(win, "statuscolumn", "")
-  wset(win, "statusline", " Vim Dojo")
+  wset(win, "fillchars", "eob: ") -- no ~ below short screens
+  -- '%' starts a statusline item; key help is plain text
+  local text = (status or " Vim Dojo"):gsub("%%", "%%%%")
+  wset(win, "statusline", text)
 end
 
 function M.open()
@@ -73,11 +77,19 @@ function M.open()
   vim.api.nvim_create_autocmd("TabLeave", {
     group = group,
     callback = function()
-      if vim.api.nvim_get_current_tabpage() == state.tab and require("dojo.session").current() then
+      if vim.api.nvim_get_current_tabpage() ~= state.tab then
+        return
+      end
+      local replay = require("dojo.ui.review").replaying()
+      if require("dojo.session").current() or replay then
         vim.schedule(function()
           require("dojo.session").abort()
           if valid_win(state.win) then
-            require("dojo.ui.menu").show()
+            if replay then
+              require("dojo.ui.review").resume()
+            else
+              require("dojo.ui.menu").show()
+            end
           end
         end)
       end
@@ -110,6 +122,7 @@ function M.watch(win)
     once = true,
     callback = function()
       local hud = state.hud
+      local replay = require("dojo.ui.review").replaying()
       state.win, state.hud = nil, nil
       require("dojo.round").abort()
       vim.schedule(function()
@@ -118,7 +131,11 @@ function M.watch(win)
           state.win = hud
           wset(hud, "winfixheight", false)
           M.watch(hud)
-          require("dojo.ui.menu").show()
+          if replay then
+            require("dojo.ui.review").resume() -- :q in a replay: back to its review
+          else
+            require("dojo.ui.menu").show()
+          end
         end
       end)
     end,
@@ -134,12 +151,15 @@ function M.focus()
   return win
 end
 
--- show a named buffer in the main window
+-- show a named buffer in the main window; opts.play for the play buffer,
+-- opts.status for the key help in the status line
 function M.show(name, opts)
+  opts = opts or {}
   local win = M.open()
   local b = M.buf(name)
   vim.api.nvim_win_set_buf(win, b)
-  window_options(win, opts and opts.play or false)
+  window_options(win, opts.play or false, opts.status)
+  vim.cmd('echo ""') -- a message from the last screen does not belong here
   local w = state.wipe
   if w and vim.api.nvim_buf_is_valid(w) and #vim.fn.win_findbuf(w) == 0 and not vim.bo[w].modified then
     pcall(vim.api.nvim_buf_delete, w, { force = true })
@@ -149,7 +169,7 @@ function M.show(name, opts)
 end
 
 function M.play()
-  return M.show("play", { play = true })
+  return M.show("play", { play = true, status = " <Tab> hint   :q menu" })
 end
 
 function M.open_hud()
